@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마늘 생산비 조사 설문지 - 사단법인 전국마늘생산자협회</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .step-card {
+            transition: all 0.3s ease;
+        }
+        .step-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 min-h-screen">
+    <div id="app"></div>
+
+    <script>
+        // ==================== 설정 ====================
+        
+        // 🔥 중요: Google Apps Script 배포 후 여기에 URL을 입력하세요!
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyddb2aW1WXORKjC0oJsabEPKX1_KgGT_xpg4Op2O2Zm1QiHUWl9XZyjjAuWevwm2w/exec';
+        
+        // ==================== 유틸리티 함수 ====================
+        
+        // 전화번호 포맷팅
+        function formatPhone(value) {
+            const numbers = value.replace(/[^0-9]/g, '');
+            if (numbers.length <= 3) return numbers;
+            if (numbers.length <= 7) return numbers.slice(0, 3) + '-' + numbers.slice(3);
+            if (numbers.length <= 11) return numbers.slice(0, 3) + '-' + numbers.slice(3, 7) + '-' + numbers.slice(7);
+            return numbers.slice(0, 3) + '-' + numbers.slice(3, 7) + '-' + numbers.slice(7, 11);
+        }
+
+        // XSS 방지 - HTML 이스케이프
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // 로딩 표시
+        function showLoading(message = '로딩 중...') {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="loading mx-auto mb-4"></div>
+                        <p class="text-gray-600">${message}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 데이터 관리 ====================
+        
+        // 서버에서 데이터 불러오기
+        async function loadFromServer(phoneNumber) {
+            try {
+                const response = await fetch(`${SCRIPT_URL}?action=load&phone=${encodeURIComponent(phoneNumber)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`서버 응답 오류: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    // 서버 데이터를 localStorage에 동기화
+                    localStorage.setItem(`garlic_survey_${phoneNumber}`, JSON.stringify(result.data));
+                    console.log('✅ 서버에서 데이터 로드 성공');
+                    return result.data;
+                }
+            } catch (error) {
+                console.error('⚠️ 서버 데이터 로드 실패:', error);
+            }
+            
+            // 서버 실패 시 localStorage 사용
+            const localData = localStorage.getItem(`garlic_survey_${phoneNumber}`);
+            if (localData) {
+                console.log('📱 localStorage에서 데이터 로드');
+                return JSON.parse(localData);
+            }
+            
+            return {};
+        }
+
+        // ==================== 로그인 ====================
+        
+        // 전화번호 인증 및 저장
+        async function login() {
+            const phoneInput = document.getElementById('phoneInput');
+            const phone = phoneInput.value;
+            const phoneRegex = /^010-\d{4}-\d{4}$/;
+            
+            if (!phone) {
+                alert('전화번호를 입력해주세요');
+                phoneInput.focus();
+                return;
+            }
+            
+            if (!phoneRegex.test(phone)) {
+                alert('올바른 전화번호 형식이 아닙니다.\n예: 010-1234-5678');
+                phoneInput.focus();
+                return;
+            }
+            
+            // 로그인 처리
+            localStorage.setItem('garlic_survey_phone', phone);
+            
+            // 메인 페이지 로드
+            showLoading('데이터를 불러오는 중...');
+            await showMainPage();
+        }
+
+        // 로그아웃
+        function logout() {
+            if (confirm('로그아웃 하시겠습니까?\n\n작성한 데이터는 서버에 저장되어 있으며,\n같은 전화번호로 다시 로그인하면 이어서 작성할 수 있습니다.')) {
+                localStorage.removeItem('garlic_survey_phone');
+                render();
+            }
+        }
+
+        // ==================== 메인 페이지 ====================
+        
+        // 메인 페이지 표시
+        async function showMainPage() {
+            const phone = localStorage.getItem('garlic_survey_phone');
+            
+            if (!phone) {
+                showLoginPage();
+                return;
+            }
+            
+            // 서버에서 데이터 불러오기
+            const allData = await loadFromServer(phone);
+            
+            // 완료 상태 추출
+            const completedStages = {
+                completed_stage_1: allData.completed_stage_1 || false,
+                completed_stage_2: allData.completed_stage_2 || false,
+                completed_stage_3: allData.completed_stage_3 || false,
+                completed_stage_4: allData.completed_stage_4 || false,
+                completed_stage_5: allData.completed_stage_5 || false,
+                completed_stage_6: allData.completed_stage_6 || false,
+                completed_stage_7: allData.completed_stage_7 || false,
+                completed_stage_8: allData.completed_stage_8 || false
+            };
+            
+            // 진행률 계산
+            const completedCount = Object.values(completedStages).filter(v => v === true).length;
+            const progressPercent = Math.round((completedCount / 8) * 100);
+
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="container mx-auto px-4 py-8 max-w-4xl">
+                    <!-- 헤더 -->
+                    <div class="text-center mb-12 fade-in">
+                        <div class="bg-white rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6 shadow-lg">
+                            <span class="text-6xl">🧄</span>
+                        </div>
+                        <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
+                            마늘 생산비 조사 설문지
+                        </h1>
+                        <p class="text-lg text-gray-600 mb-4">
+                            사단법인 전국마늘생산자협회
+                        </p>
+                        
+                        <!-- 로그인 정보 박스 -->
+                        <div class="inline-flex items-center gap-3 bg-white px-8 py-4 rounded-full border-2 border-blue-300 shadow-lg mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-700 text-xl">👤</span>
+                                <span class="text-gray-800 font-bold text-base">로그인:</span>
+                                <span class="text-blue-600 font-bold text-lg">${escapeHtml(phone)}</span>
+                            </div>
+                            <div class="h-6 w-px bg-gray-300"></div>
+                            <button onclick="logout()" class="flex items-center gap-1 text-base font-bold text-gray-700 hover:text-red-600 transition-colors">
+                                <span class="text-lg">🚪</span>
+                                <span>로그아웃</span>
+                            </button>
+                        </div>
+                        
+                        <!-- 전체 진행률 -->
+                        ${allData.name ? `
+                        <div class="bg-white px-6 py-3 rounded-lg shadow inline-block mb-4">
+                            <p class="text-sm text-gray-600 mb-1">
+                                <strong>${escapeHtml(allData.name)}</strong>님의 진행 상황
+                            </p>
+                            <div class="flex items-center gap-3">
+                                <div class="flex-1 bg-gray-200 rounded-full h-3 w-48">
+                                    <div class="bg-green-600 h-3 rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
+                                </div>
+                                <span class="text-lg font-bold text-green-600">${progressPercent}%</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">
+                                ${completedCount}/8 단계 완료
+                            </p>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- 작성 안내 -->
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-lg mb-4 fade-in shadow-md">
+                        <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center">
+                            <span class="text-2xl mr-2">📋</span>
+                            작성 안내
+                        </h2>
+                        <ul class="space-y-2 text-gray-700">
+                            <li class="flex items-start">
+                                <span class="text-green-600 mr-2">•</span>
+                                <span>각 단계별로 해당하는 항목에 체크(✓) 또는 답변을 기입해 주세요.</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-green-600 mr-2">•</span>
+                                <span>금액은 원 단위로 기재해 주세요.</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-green-600 mr-2">•</span>
+                                <span>해당사항이 없는 경우 "0" 또는 "-"로 표시해 주세요.</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-green-600 mr-2">•</span>
+                                <span>총 8단계로 구성되어 있으며, 각 단계별 작업이 완료된 후 작성해주세요.</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 중요 안내사항 -->
+                    <div class="bg-blue-50 border-l-4 border-blue-400 p-6 rounded-lg mb-8 fade-in shadow-md">
+                        <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center">
+                            <span class="text-2xl mr-2">💡</span>
+                            중요 안내사항
+                        </h2>
+                        <ul class="space-y-2 text-gray-700">
+                            <li class="flex items-start">
+                                <span class="text-blue-600 mr-2">✔</span>
+                                <span>각 단계 완료 시 <strong>서버에 자동 저장</strong>됩니다</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-blue-600 mr-2">✔</span>
+                                <span>제출 후에도 <strong>언제든지 수정 가능</strong>합니다</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-blue-600 mr-2">✔</span>
+                                <span>언제든지 중단하고 나중에 <strong>이어서 작성</strong> 가능합니다</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-blue-600 mr-2">✔</span>
+                                <span>다른 기기에서도 <strong>같은 전화번호</strong>로 접속하여 계속 작성할 수 있습니다</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 설문 단계 카드들 -->
+                    <div class="space-y-6">
+                        <!-- 1단계: 기본정보 -->
+                        <div class="step-card bg-white rounded-lg shadow-lg p-6 border-l-4 border-blue-500 fade-in">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="bg-blue-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                                        ${completedStages.completed_stage_1 ? '<span class="text-2xl">✅</span>' : '<span class="text-2xl">🏡</span>'}
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800">1단계: 기본정보</h3>
+                                        <p class="text-sm text-gray-600">농가 정보, 재배 경력, 영농 경력</p>
+                                        ${completedStages.completed_stage_1 ? '<p class="text-xs text-green-600 font-medium">✓ 제출 완료</p>' : ''}
+                                    </div>
+                                </div>
+                                <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    15개 질문
+                                </span>
+                            </div>
+                            <a href="1단계-기본정보.html" 
+                               class="block w-full ${completedStages.completed_stage_1 ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white text-center py-3 rounded-lg font-medium transition-colors">
+                                ${completedStages.completed_stage_1 ? '수정하기 →' : '시작하기 →'}
+                            </a>
+                        </div>
+
+                        <!-- 2단계: 토양준비 -->
+                        <div class="step-card bg-white rounded-lg shadow-lg p-6 border-l-4 border-orange-500 fade-in" style="animation-delay: 0.1s">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="bg-orange-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                                        ${completedStages.completed_stage_2 ? '<span class="text-2xl">✅</span>' : '<span class="text-2xl">🚜</span>'}
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800">2단계: 토양준비</h3>
+                                        <p class="text-sm text-gray-600">밭갈이, 토양소독, 이랑만들기, 밑거름 | 8~9월</p>
+                                        ${completedStages.completed_stage_2 ? '<p class="text-xs text-green-600 font-medium">✓ 제출 완료</p>' : ''}
+                                    </div>
+                                </div>
+                                <span class="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    레코드 기반
+                                </span>
+                            </div>
+                            <a href="2단계-토양준비.html" 
+                               class="block w-full ${completedStages.completed_stage_2 ? 'bg-green-600 hover:bg-green-700' : 'bg-orange-600 hover:bg-orange-700'} text-white text-center py-3 rounded-lg font-medium transition-colors">
+                                ${completedStages.completed_stage_2 ? '수정하기 →' : '계속하기 →'}
+                            </a>
+                        </div>
+
+                        <!-- 3단계: 종구준비 -->
+                        <div class="step-card bg-white rounded-lg shadow-lg p-6 border-l-4 border-purple-500 fade-in" style="animation-delay: 0.2s">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="bg-purple-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                                        ${completedStages.completed_stage_3 ? '<span class="text-2xl">✅</span>' : '<span class="text-2xl">🧄</span>'}
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800">3단계: 종구준비</h3>
+                                        <p class="text-sm text-gray-600">씨마늘 확보, 소독, 쪽분리 | 9월</p>
+                                        ${completedStages.completed_stage_3 ? '<p class="text-xs text-green-600 font-medium">✓ 제출 완료</p>' : ''}
+                                    </div>
+                                </div>
+                                <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    레코드 기반
+                                </span>
+                            </div>
+                            <a href="3단계-종구준비.html" 
+                               class="block w-full ${completedStages.completed_stage_3 ? 'bg-green-600 hover:bg-green-700' : 'bg-purple-600 hover:bg-purple-700'} text-white text-center py-3 rounded-lg font-medium transition-colors">
+                                ${completedStages.completed_stage_3 ? '수정하기 →' : '계속하기 →'}
+                            </a>
+                        </div>
+
+                        <!-- 4단계: 파종 및 멀칭 -->
+                        <div class="step-card bg-white rounded-lg shadow-lg p-6 border-l-4 border-green-500 fade-in" style="animation-delay: 0.3s">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="bg-green-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                                        ${completedStages.completed_stage_4 ? '<span class="text-2xl">✅</span>' : '<span class="text-2xl">🌱</span>'}
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800">4단계: 파종 및 멀칭</h3>
+                                        <p class="text-sm text-gray-600">고랑만들기, 파종, 관수, 비닐피복 | 10월</p>
+                                        ${completedStages.completed_stage_4 ? '<p class="text-xs text-green-600 font-medium">✓ 제출 완료</p>' : ''}
+                                    </div>
+                                </div>
+                                <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    레코드 기반
+                                </span>
+                            </div>
+                            <a href="4단계-파종멀칭.html" 
+                               class="block w-full ${completedStages.completed_stage_4 ? 'bg-green-600 hover:bg-green-700' : 'bg-green-600 hover:bg-green-700'} text-white text-center py-3 rounded-lg font-medium transition-colors">
+                                ${completedStages.completed_stage_4 ? '수정하기 →' : '계속하기 →'}
+                            </a>
+                        </div>
+
+                        <!-- 5단계: 보온 피복 -->
+                        <div class="step-card bg-white rounded-lg shadow-lg p-6 border-l-4 border-sky-500 fade-in" style="animation-delay: 0.4s">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="bg-sky-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                                        ${completedStages.completed_stage_5 ? '<span class="text-2xl">✅</span>' : '<span class="text-2xl">❄️</span>'}
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800">5단계: 보온 피복</h3>
+                                        <p class="text-sm text-gray-600">부직포 피복 및 제거 | 11월~3월</p>
+                                        ${completedStages.completed_stage_5 ? '<p class="text-xs text-green-600 font-medium">✓ 제출 완료</p>' : ''}
+                                    </div>
+                                </div>
+                                <span class="bg-sky-100 text-sky-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    레코드 기반
+                                </span>
+                            </div>
+                            <a href="5단계-보온피복.html" 
+                               class="block w-full ${completedStages.completed_stage_5 ? 'bg-green-600 hover:bg-green-700' : 'bg-sky-600 hover:bg-sky-700'} text-white text-center py-3 rounded-lg font-medium transition-colors">
+                                ${completedStages.completed_stage_5 ? '수정하기 →' : '계속하기 →'}
+                            </a>
+                        </div>
+
+                        <!-- 6단계: 생육관리 -->
+                        <div class="step-card bg-white rounded-lg shadow-lg p-6 border-l-4 border-teal-500 fade-in" style="animation-delay: 0.5s">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="bg-teal-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                                        ${completedStages.completed_stage_6 ? '<span class="text-2xl">✅</span>' : '<span class="text-2xl">🌿</span>'}
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800">6단계: 생육관리</h3>
+                                        <p class="text-sm text-gray-600">웃거름, 병해충 방제, 제초 | 3~5월</p>
+                                        ${completedStages.completed_stage_6 ? '<p class="text-xs text-green-600 font-medium">✓ 제출 완료</p>' : ''}
+                                    </div>
+                                </div>
+                                <span class="bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    레코드 기반
+                                </span>
+                            </div>
+                            <a href="6단계-생육관리.html" 
+                               class="block w-full ${completedStages.completed_stage_6 ? 'bg-green-600 hover:bg-green-700' : 'bg-teal-600 hover:bg-teal-700'} text-white text-center py-3 rounded-lg font-medium transition-colors">
+                                ${completedStages.completed_stage_6 ? '수정하기 →' : '계속하기 →'}
+                            </a>
+                        </div>
+
+                        <!-- 7단계: 마늘쫑 뽑기 -->
+                        <div class="step-card bg-white rounded-lg shadow-lg p-6 border-l-4 border-pink-500 fade-in" style="animation-delay: 0.6s">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="bg-pink-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                                        ${completedStages.completed_stage_7 ? '<span class="text-2xl">✅</span>' : '<span class="text-2xl">🌸</span>'}
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800">7단계: 마늘쫑 뽑기</h3>
+                                        <p class="text-sm text-gray-600">쫑 뽑기 작업 및 판매 | 5월</p>
+                                        ${completedStages.completed_stage_7 ? '<p class="text-xs text-green-600 font-medium">✓ 제출 완료</p>' : ''}
+                                    </div>
+                                </div>
+                                <span class="bg-pink-100 text-pink-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    레코드 기반
+                                </span>
+                            </div>
+                            <a href="7단계-마늘쫑뽑기.html" 
+                               class="block w-full ${completedStages.completed_stage_7 ? 'bg-green-600 hover:bg-green-700' : 'bg-pink-600 hover:bg-pink-700'} text-white text-center py-3 rounded-lg font-medium transition-colors">
+                                ${completedStages.completed_stage_7 ? '수정하기 →' : '계속하기 →'}
+                            </a>
+                        </div>
+
+                        <!-- 8단계: 수확 -->
+                        <div class="step-card bg-white rounded-lg shadow-lg p-6 border-l-4 border-yellow-500 fade-in" style="animation-delay: 0.7s">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="bg-yellow-100 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+                                        ${completedStages.completed_stage_8 ? '<span class="text-2xl">✅</span>' : '<span class="text-2xl">⚡</span>'}
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800">8단계: 수확</h3>
+                                        <p class="text-sm text-gray-600">수확, 건조, 선별, 포장, 출하 | 6월</p>
+                                        ${completedStages.completed_stage_8 ? '<p class="text-xs text-green-600 font-medium">✓ 제출 완료</p>' : ''}
+                                    </div>
+                                </div>
+                                <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    레코드 기반
+                                </span>
+                            </div>
+                            <a href="8단계-수확.html" 
+                               class="block w-full ${completedStages.completed_stage_8 ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white text-center py-3 rounded-lg font-medium transition-colors">
+                                ${completedStages.completed_stage_8 ? '수정하기 →' : '계속하기 →'}
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- 하단 정보 -->
+                    <div class="mt-12 text-center text-gray-600 text-sm fade-in" style="animation-delay: 0.8s">
+                        <p class="mb-2">총 소요시간: 약 40분 | 총 8단계 74개 질문</p>
+                        <p class="text-xs text-gray-500">
+                            📱 모바일, 태블릿, PC 모두 지원 | 💾 자동 저장 기능 | ☁️ 서버 동기화
+                        </p>
+                        ${allData.timestamp ? `
+                        <p class="text-xs text-gray-400 mt-2">
+                            마지막 수정: ${new Date(allData.timestamp).toLocaleString('ko-KR')}
+                        </p>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 로그인 페이지 ====================
+        
+        // 로그인 페이지 표시
+        function showLoginPage() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen flex items-center justify-center p-4">
+                    <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-8 fade-in">
+                        <div class="text-center mb-6">
+                            <div class="bg-green-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                                <span class="text-4xl">🧄</span>
+                            </div>
+                            <h1 class="text-2xl font-bold text-gray-800 mb-2">마늘 생산비 조사 설문지</h1>
+                            <p class="text-gray-600 text-sm mb-1">사단법인 전국마늘생산자협회</p>
+                            <p class="text-gray-600 text-sm">전화번호로 로그인해주세요</p>
+                        </div>
+                        
+                        <input
+                            type="text"
+                            id="phoneInput"
+                            placeholder="010-0000-0000"
+                            maxlength="13"
+                            class="w-full p-4 text-lg border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none mb-4"
+                        />
+                        
+                        <button
+                            onclick="login()"
+                            class="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                        >
+                            시작하기
+                        </button>
+                        
+                        <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-2">
+                                <strong>안내사항:</strong>
+                            </p>
+                            <ul class="text-xs text-gray-600 space-y-1">
+                                <li>• 전화번호로 데이터가 서버에 저장됩니다</li>
+                                <li>• 같은 번호로 로그인하면 이어서 작성 가능</li>
+                                <li>• 다른 기기에서도 접속 가능합니다</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 전화번호 입력 필드 이벤트 설정
+            setTimeout(() => {
+                const phoneInput = document.getElementById('phoneInput');
+                if (phoneInput) {
+                    phoneInput.addEventListener('input', function(e) {
+                        e.target.value = formatPhone(e.target.value);
+                    });
+                    phoneInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            login();
+                        }
+                    });
+                    phoneInput.focus();
+                }
+            }, 100);
+        }
+
+        // ==================== 초기화 ====================
+        
+        // 초기 렌더링 - 로그인 여부 확인
+        async function render() {
+            const phone = localStorage.getItem('garlic_survey_phone');
+            if (phone) {
+                // 로그인된 사용자 → 메인 페이지
+                showLoading('데이터를 불러오는 중...');
+                await showMainPage();
+            } else {
+                // 로그인 안된 사용자 → 로그인 화면
+                showLoginPage();
+            }
+        }
+
+        // 페이지 로드 시 실행
+        render();
+    </script>
+</body>
+</html>

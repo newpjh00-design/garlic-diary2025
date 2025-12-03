@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마늘 생산비 조사 - 8단계: 수확</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-yellow-50 to-yellow-100 min-h-screen">
+    <div id="app"></div>
+    <script>
+        const surveyState = {
+            view: 'list',
+            formData: {},
+            phoneNumber: '',
+            stage: 8,
+            records: [],
+            editingId: null
+        };
+
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyddb2aW1WXORKjC0oJsabEPKX1_KgGT_xpg4Op2O2Zm1QiHUWl9XZyjjAuWevwm2w/exec';
+
+        // 작업 종류별 방법 옵션
+        const methodOptions = {
+            '굴취': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
+            '흙털기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
+            '주대자르기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
+            '담기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
+            '수확 후 건조': ['건조장 위탁', '본인건조기 사용', '선풍기 사용', '자연건조'],
+            '선별': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
+            '포장(망작업)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
+            '출하': ['위탁 (남에게 맡김)', '직접 운송']
+        };
+
+        function updateFormFields(workType) {
+            const methodContainer = document.getElementById('methodContainer');
+            const harvestAmountContainer = document.getElementById('harvestAmountContainer');
+            const transportCostContainer = document.getElementById('transportCostContainer');
+            
+            // 작업 방법 필드
+            if (methodOptions[workType] && methodOptions[workType].length > 0) {
+                methodContainer.style.display = 'block';
+                const methodSelect = document.getElementById('method');
+                methodSelect.innerHTML = '<option value="">선택하세요</option>' + 
+                    methodOptions[workType].map(option => `<option value="${option}">${option}</option>`).join('');
+            } else {
+                methodContainer.style.display = 'none';
+            }
+            
+            // 총 수확량 필드 (굴취 작업일 때만 표시)
+            if (workType === '굴취') {
+                harvestAmountContainer.style.display = 'block';
+            } else {
+                harvestAmountContainer.style.display = 'none';
+            }
+            
+            // 운송비(유류비) 필드 (출하 작업일 때만 표시)
+            if (workType === '출하') {
+                transportCostContainer.style.display = 'block';
+            } else {
+                transportCostContainer.style.display = 'none';
+            }
+        }
+
+        function saveData() {
+            if (surveyState.phoneNumber) {
+                const dataToSave = {
+                    stage_8_records: surveyState.records,
+                    stage_8_summary: calculateSummary(),
+                    completed_stage_8: surveyState.formData.completed_stage_8 || false,
+                    savedAt: new Date().toISOString(),
+                    stage: surveyState.stage,
+                    phoneNumber: surveyState.phoneNumber
+                };
+                
+                const allData = localStorage.getItem(`garlic_survey_${surveyState.phoneNumber}`);
+                const parsed = allData ? JSON.parse(allData) : {};
+                Object.assign(parsed, dataToSave);
+                
+                localStorage.setItem(`garlic_survey_${surveyState.phoneNumber}`, JSON.stringify(parsed));
+            }
+        }
+
+        function loadData() {
+            if (surveyState.phoneNumber) {
+                const savedData = localStorage.getItem(`garlic_survey_${surveyState.phoneNumber}`);
+                if (savedData) {
+                    const parsed = JSON.parse(savedData);
+                    surveyState.records = parsed.stage_8_records || [];
+                    surveyState.formData = parsed;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function calculateSummary() {
+            const totalRecords = surveyState.records.length;
+            const totalMaterialCost = surveyState.records.reduce((sum, r) => sum + (parseInt(r.material_cost) || 0), 0);
+            const totalLaborCost = surveyState.records.reduce((sum, r) => sum + (parseInt(r.labor_cost) || 0), 0);
+            
+            return {
+                total_records: totalRecords,
+                total_material_cost: totalMaterialCost,
+                total_labor_cost: totalLaborCost,
+                total_cost: totalMaterialCost + totalLaborCost
+            };
+        }
+
+        function addOrUpdateRecord(recordData) {
+            if (surveyState.editingId !== null) {
+                const index = surveyState.records.findIndex(r => r.id === surveyState.editingId);
+                if (index !== -1) {
+                    surveyState.records[index] = { ...recordData, id: surveyState.editingId };
+                }
+                surveyState.editingId = null;
+            } else {
+                const newId = surveyState.records.length > 0 
+                    ? Math.max(...surveyState.records.map(r => r.id)) + 1 
+                    : 1;
+                surveyState.records.push({ ...recordData, id: newId });
+            }
+            saveData();
+            surveyState.view = 'list';
+            render();
+        }
+
+        function editRecord(id) {
+            surveyState.editingId = id;
+            surveyState.view = 'form';
+            render();
+        }
+
+        function deleteRecord(id) {
+            if (confirm('이 작업 기록을 삭제하시겠습니까?')) {
+                surveyState.records = surveyState.records.filter(r => r.id !== id);
+                saveData();
+                render();
+            }
+        }
+
+        function showAddForm() {
+            surveyState.editingId = null;
+            surveyState.view = 'form';
+            render();
+        }
+
+        function cancelForm() {
+            surveyState.editingId = null;
+            surveyState.view = 'list';
+            render();
+        }
+
+        async function submitStage() {
+            if (surveyState.records.length === 0) {
+                alert('⚠️ 최소 1개 이상의 작업을 기록해야 제출할 수 있습니다.');
+                return;
+            }
+
+            const summary = calculateSummary();
+            
+            const submitData = {
+                timestamp: new Date().toISOString(),
+                phoneNumber: surveyState.phoneNumber,
+                stage: 8,
+                stage_8_records: surveyState.records,
+                stage_8_summary: summary,
+                completed_stage_8: true
+            };
+
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(submitData)
+                });
+
+                surveyState.formData.completed_stage_8 = true;
+                saveData();
+
+                alert('✅ 8단계가 제출되었습니다!\n\n메인 화면으로 돌아가 다음 단계를 진행하세요.');
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error('제출 오류:', error);
+                alert('✅ 8단계가 저장되었습니다!\n\n메인 화면으로 돌아가 다음 단계를 진행하세요.');
+                window.location.href = 'index.html';
+            }
+        }
+
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            
+            const workType = document.querySelector('input[name="work_type"]:checked')?.value;
+            
+            if (!workType) {
+                alert('작업 종류를 선택해주세요.');
+                return;
+            }
+
+            const formData = {
+                date: document.getElementById('date').value,
+                work_type: workType,
+                material_cost: document.getElementById('material_cost').value || '0',
+                labor_cost: document.getElementById('labor_cost').value || '0',
+                memo: document.getElementById('memo').value
+            };
+
+            // 작업 방법이 있는 경우
+            if (methodOptions[workType] && methodOptions[workType].length > 0) {
+                formData.method = document.getElementById('method').value;
+                if (!formData.method) {
+                    alert('작업 방법을 선택해주세요.');
+                    return;
+                }
+            }
+
+            // 굴취 작업인 경우 총 수확량 필수
+            if (workType === '굴취') {
+                formData.harvest_amount = document.getElementById('harvest_amount').value;
+                if (!formData.harvest_amount) {
+                    alert('총 수확량을 입력해주세요.');
+                    return;
+                }
+            }
+
+            // 출하 작업인 경우 운송비 필수
+            if (workType === '출하') {
+                formData.transport_cost = document.getElementById('transport_cost').value;
+                if (!formData.transport_cost) {
+                    alert('운송비(유류비)를 입력해주세요.');
+                    return;
+                }
+            }
+
+            addOrUpdateRecord(formData);
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            const savedPhone = localStorage.getItem('garlic_survey_phone');
+            
+            if (!savedPhone) {
+                app.innerHTML = `
+                    <div class="min-h-screen flex items-center justify-center p-4">
+                        <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+                            <div class="bg-yellow-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                                <span class="text-4xl">⚠️</span>
+                            </div>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">로그인이 필요합니다</h2>
+                            <p class="text-gray-600 mb-6">먼저 메인 화면에서 전화번호로 로그인해주세요.</p>
+                            <a href="index.html" class="inline-block px-6 py-3 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700">메인 화면으로 이동</a>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            if (!surveyState.phoneNumber) {
+                surveyState.phoneNumber = savedPhone;
+                loadData();
+            }
+
+            if (surveyState.view === 'intro') {
+                renderIntro(app);
+            } else if (surveyState.view === 'list') {
+                renderList(app);
+            } else if (surveyState.view === 'form') {
+                renderForm(app);
+            }
+        }
+
+        function renderIntro(app) {
+            app.innerHTML = `
+                <div class="min-h-screen flex items-center justify-center p-4">
+                    <div class="max-w-2xl w-full bg-white rounded-lg shadow-lg p-8 text-center space-y-6 fade-in">
+                        <div class="bg-yellow-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto">
+                            <span class="text-4xl">⚡</span>
+                        </div>
+                        <h1 class="text-3xl font-bold text-gray-800">마늘 생산비 조사</h1>
+                        <p class="text-xl text-yellow-600 font-medium">8단계: 수확</p>
+                        <p class="text-gray-600">수확, 건조, 선별, 포장, 출하 작업을 작업일지 방식으로 기록합니다.</p>
+                        
+                        <div class="bg-blue-50 p-6 rounded-lg text-left">
+                            <h3 class="font-bold text-gray-800 mb-3">📝 작업 방식 안내</h3>
+                            <ul class="text-sm text-gray-700 space-y-2">
+                                <li>✅ 각 작업마다 기록 추가</li>
+                                <li>✅ 날짜, 작업종류, 비용 입력</li>
+                                <li>✅ 언제든지 추가/수정/삭제 가능</li>
+                                <li>✅ 최소 1개 이상 기록 후 제출</li>
+                            </ul>
+                        </div>
+                        <div class="flex gap-4 justify-center">
+                            <a href="index.html" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">← 메인으로</a>
+                            <button onclick="surveyState.view = 'list'; render();" class="px-8 py-3 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 text-lg">시작하기 →</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderList(app) {
+            const summary = calculateSummary();
+            const isAlreadySubmitted = surveyState.formData.completed_stage_8;
+            
+            const recordsHTML = surveyState.records.length > 0 
+                ? surveyState.records.map(record => `
+                    <div class="bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-lg font-bold text-yellow-600">${record.work_type}</span>
+                                    <span class="text-sm text-gray-500">${record.date}</span>
+                                </div>
+                                <div class="text-sm text-gray-700 space-y-1">
+                                    ${record.method ? `<p>🔧 작업방법: ${record.method}</p>` : ''}
+                                    ${record.harvest_amount ? `<p>⚖️ 총 수확량: ${parseFloat(record.harvest_amount)}kg</p>` : ''}
+                                    ${record.transport_cost ? `<p>🚚 운송비(유류비): ${parseInt(record.transport_cost).toLocaleString()}원</p>` : ''}
+                                    <p>💰 자재비: ${parseInt(record.material_cost).toLocaleString()}원</p>
+                                    ${record.labor_cost && parseInt(record.labor_cost) > 0 ? `<p>👷 인건비: ${parseInt(record.labor_cost).toLocaleString()}원</p>` : ''}
+                                    ${record.memo ? `<p>📝 ${record.memo}</p>` : ''}
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="editRecord(${record.id})" class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">수정</button>
+                                <button onclick="deleteRecord(${record.id})" class="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">삭제</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')
+                : '<div class="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300"><p class="text-gray-500 mb-4">📝 아직 기록된 작업이 없습니다</p><p class="text-sm text-gray-400">작업을 진행하실 때마다 기록해주세요</p></div>';
+
+            app.innerHTML = `
+                <div class="min-h-screen p-4">
+                    <div class="max-w-3xl mx-auto">
+                        <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-4">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h1 class="text-lg md:text-2xl font-bold text-gray-800">마늘 생산비 조사</h1>
+                                    <p class="text-sm text-yellow-600">8단계: 수확</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <a href="index.html" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300">메인</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-bold text-gray-800">📝 작업 기록</h2>
+                                <button onclick="showAddForm()" class="px-4 py-2 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700">
+                                    + 새 작업 기록하기
+                                </button>
+                            </div>
+
+                            ${isAlreadySubmitted ? '<div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded mb-4"><p class="text-sm text-gray-700">✅ <strong>이미 제출된 단계입니다</strong><br>추가 작업을 기록하고 "다시 제출하기"를 눌러주세요.</p></div>' : ''}
+
+                            <div class="space-y-3">
+                                ${recordsHTML}
+                            </div>
+                        </div>
+
+                        ${surveyState.records.length > 0 ? `
+                        <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
+                            <h3 class="font-bold text-gray-800 mb-3">💰 비용 합계</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                                <div class="bg-blue-50 p-4 rounded-lg">
+                                    <p class="text-sm text-gray-600 mb-1">작업 횟수</p>
+                                    <p class="text-2xl font-bold text-blue-600">${summary.total_records}회</p>
+                                </div>
+                                <div class="bg-green-50 p-4 rounded-lg">
+                                    <p class="text-sm text-gray-600 mb-1">자재비</p>
+                                    <p class="text-lg font-bold text-green-600">${summary.total_material_cost.toLocaleString()}원</p>
+                                </div>
+                                <div class="bg-purple-50 p-4 rounded-lg">
+                                    <p class="text-sm text-gray-600 mb-1">인건비</p>
+                                    <p class="text-lg font-bold text-purple-600">${summary.total_labor_cost.toLocaleString()}원</p>
+                                </div>
+                                <div class="bg-yellow-50 p-4 rounded-lg">
+                                    <p class="text-sm text-gray-600 mb-1">총 비용</p>
+                                    <p class="text-lg font-bold text-yellow-600">${summary.total_cost.toLocaleString()}원</p>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <div class="bg-white rounded-lg shadow-lg p-6">
+                            ${surveyState.records.length === 0 ? 
+                                '<div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded mb-4"><p class="text-sm text-gray-700">⚠️ 최소 1개 이상의 작업을 기록해야 제출할 수 있습니다.</p></div>' 
+                                : ''}
+                            <button 
+                                onclick="submitStage()" 
+                                class="w-full px-6 py-3 ${surveyState.records.length === 0 ? 'bg-gray-300 cursor-not-allowed' : isAlreadySubmitted ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white rounded-lg font-medium text-lg"
+                                ${surveyState.records.length === 0 ? 'disabled' : ''}
+                            >
+                                ${isAlreadySubmitted ? '다시 제출하기' : '제출하기'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderForm(app) {
+            const editingRecord = surveyState.editingId !== null 
+                ? surveyState.records.find(r => r.id === surveyState.editingId)
+                : null;
+
+            const today = new Date().toISOString().split('T')[0];
+
+            const workTypes = ['굴취', '흙털기', '주대자르기', '담기', '수확 후 건조', '선별', '포장(망작업)', '출하'];
+
+            app.innerHTML = `
+                <div class="min-h-screen p-4">
+                    <div class="max-w-2xl mx-auto">
+                        <div class="bg-white rounded-lg shadow-lg p-6">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                                ${editingRecord ? '✏️ 작업 기록 수정' : '➕ 새 작업 기록'}
+                            </h2>
+
+                            <form id="recordForm" onsubmit="handleFormSubmit(event)" class="space-y-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        📅 작업 날짜 <span class="text-red-500">*</span>
+                                    </label>
+                                    <input 
+                                        type="date" 
+                                        id="date"
+                                        value="${editingRecord ? editingRecord.date : today}"
+                                        max="${today}"
+                                        required
+                                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        📌 작업 종류 <span class="text-red-500">*</span>
+                                    </label>
+                                    <div class="space-y-2">
+                                        ${workTypes.map(type => `
+                                            <label class="flex items-center space-x-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-yellow-50 transition-colors ${editingRecord && editingRecord.work_type === type ? 'border-yellow-500 bg-yellow-50' : 'border-gray-300'}">
+                                                <input 
+                                                    type="radio" 
+                                                    name="work_type" 
+                                                    value="${type}"
+                                                    ${editingRecord && editingRecord.work_type === type ? 'checked' : ''}
+                                                    onchange="updateFormFields(this.value)"
+                                                    class="w-5 h-5 text-yellow-600 focus:ring-yellow-500"
+                                                />
+                                                <span class="text-gray-800 font-medium">${type}</span>
+                                            </label>
+                                        `).join('')}
+                                    </div>
+                                </div>
+
+                                <div id="methodContainer" style="display: none;">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        🔧 작업 방법 <span class="text-red-500">*</span>
+                                    </label>
+                                    <select 
+                                        id="method"
+                                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                                    >
+                                        <option value="">선택하세요</option>
+                                    </select>
+                                </div>
+
+                                <div id="harvestAmountContainer" style="display: none;">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        ⚖️ 총 수확량 (kg) <span class="text-red-500">*</span>
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        id="harvest_amount"
+                                        min="0"
+                                        step="0.1"
+                                        placeholder="수확한 마늘의 총 무게"
+                                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                                    />
+                                    <p class="text-xs text-gray-500 mt-1">수확한 마늘의 총 무게(kg)</p>
+                                </div>
+
+                                <div id="transportCostContainer" style="display: none;">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        🚚 운송비(유류비) (원) <span class="text-red-500">*</span>
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        id="transport_cost"
+                                        min="0"
+                                        placeholder="운송비 또는 유류비"
+                                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                                    />
+                                    <p class="text-xs text-gray-500 mt-1">출하 시 발생한 운송비 또는 유류비</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        💰 자재비 (원)
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        id="material_cost"
+                                        value="${editingRecord ? editingRecord.material_cost : ''}"
+                                        min="0"
+                                        placeholder="자재 구입 비용"
+                                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                                    />
+                                    <p class="text-xs text-gray-500 mt-1">자재 구입 비용</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        👷 인건비 (원)
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        id="labor_cost"
+                                        value="${editingRecord ? editingRecord.labor_cost : ''}"
+                                        min="0"
+                                        placeholder="작업 인건비"
+                                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                                    />
+                                    <p class="text-xs text-gray-500 mt-1">작업 인건비 (고용 또는 위탁)</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        📝 메모 (선택사항)
+                                    </label>
+                                    <textarea 
+                                        id="memo"
+                                        rows="3"
+                                        placeholder="약재명, 자재명, 사용량 등을 기록하세요&#10;예: 수확량 3,000kg, 포장재 500개, 출하처 농협"
+                                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                                    >${editingRecord ? editingRecord.memo : ''}</textarea>
+                                </div>
+
+                                <div class="flex gap-4">
+                                    <button 
+                                        type="button"
+                                        onclick="cancelForm()"
+                                        class="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300"
+                                    >
+                                        취소
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        class="flex-1 px-6 py-3 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700"
+                                    >
+                                        ${editingRecord ? '수정 완료' : '기록 추가'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 수정 모드일 때 필드 초기화
+            if (editingRecord && editingRecord.work_type) {
+                setTimeout(() => {
+                    updateFormFields(editingRecord.work_type);
+                    
+                    // 작업 방법 설정
+                    if (editingRecord.method) {
+                        const methodSelect = document.getElementById('method');
+                        if (methodSelect) methodSelect.value = editingRecord.method;
+                    }
+                    
+                    // 총 수확량 설정
+                    if (editingRecord.harvest_amount) {
+                        const harvestAmount = document.getElementById('harvest_amount');
+                        if (harvestAmount) harvestAmount.value = editingRecord.harvest_amount;
+                    }
+                    
+                    // 운송비 설정
+                    if (editingRecord.transport_cost) {
+                        const transportCost = document.getElementById('transport_cost');
+                        if (transportCost) transportCost.value = editingRecord.transport_cost;
+                    }
+                }, 50);
+            }
+        }
+
+        surveyState.view = 'intro';
+        render();
+    </script>
+</body>
+</html>
