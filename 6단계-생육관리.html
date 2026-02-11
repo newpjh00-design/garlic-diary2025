@@ -34,6 +34,8 @@
         // 작업 종류별 방법 옵션
         const methodOptions = {
             '웃거름(추비)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
+            '복토': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
+            '김매기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
             '농약살포(살균제/살충제/제초제)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
             '영양제': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
             '관수(물주기)': ['스프링클러', '점적관수', '호스(수동)']
@@ -220,7 +222,7 @@
                             <h3 class="font-bold text-gray-800 mb-3">📝 작업 방식</h3>
                             <ul class="text-sm space-y-2 text-gray-700">
                                 <li>✅ 작업할 때마다 즉시 기록</li>
-                                <li>✅ 웃거름(추비), 농약살포(살균제/살충제/제초제), 영양제, 관수(물주기) 등</li>
+                                <li>✅ 웃거름(추비), 복토, 김매기, 농약살포(살균제/살충제/제초제), 영양제, 관수(물주기) 등</li>
                                 <li>✅ 날짜, 종류, 비용 입력</li>
                                 <li>✅ 언제든지 추가/수정/삭제 가능</li>
                                 <li>✅ 최소 1개 이상 기록 후 제출</li>
@@ -370,7 +372,7 @@
                                         📌 작업 종류 <span class="text-red-500">*</span>
                                     </label>
                                     <div class="space-y-2">
-                                        ${['웃거름(추비)', '농약살포(살균제/살충제/제초제)', '영양제', '관수(물주기)'].map(type => `
+                                        ${['웃거름(추비)', '복토', '김매기', '농약살포(살균제/살충제/제초제)', '영양제', '관수(물주기)'].map(type => `
                                             <label class="flex items-center space-x-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-emerald-50 transition-colors ${editingRecord && editingRecord.type === type ? 'border-emerald-500 bg-emerald-50' : 'border-gray-300'}">
                                                 <input 
                                                     type="radio" 
