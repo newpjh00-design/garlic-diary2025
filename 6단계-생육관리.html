@@ -490,7 +490,7 @@
             const formData = {
                 date: document.getElementById('date').value,
                 type: workType,
-                material_cost: document.getElementById('material_cost').value,
+                material_cost: document.getElementById('material_cost').value || '0',
                 labor_cost: document.getElementById('labor_cost').value || '0',
                 memo: document.getElementById('memo').value
             };
