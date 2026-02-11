@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마늘 생산비 조사 - 8단계: 수확 및 판매</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 640px) {
+            .survey-container { padding: 1rem; }
+            .question-card { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-orange-50 to-red-50 min-h-screen">
+    <div id="app"></div>
+
+    <script>
+        const surveyState = {
+            currentStep: 0,
+            formData: {},
+            phoneNumber: '',
+            stage: 8
+        };
+
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKtkZcrdK5btMU-o4F0ToXGc9ILLGah03dYaX21PbAIZshKfT5QXCJxdA3tpP0t7sDWQ/exec';
+
+        function saveData() {
+            if (surveyState.phoneNumber) {
+                const dataToSave = {
+                    ...surveyState.formData,
+                    savedAt: new Date().toISOString(),
+                    stage: surveyState.stage,
+                    phoneNumber: surveyState.phoneNumber
+                };
+                localStorage.setItem(`garlic_survey_${surveyState.phoneNumber}`, JSON.stringify(dataToSave));
+            }
+        }
+
+        function loadData() {
+            if (surveyState.phoneNumber) {
+                const savedData = localStorage.getItem(`garlic_survey_${surveyState.phoneNumber}`);
+                if (savedData) {
+                    const parsed = JSON.parse(savedData);
+                    surveyState.formData = parsed;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function manualSave() {
+            saveData();
+            alert('✅ 데이터가 저장되었습니다!');
+        }
+
+        function handleAnswer(key, value) {
+            surveyState.formData[key] = value;
+            saveData();
+        }
+
+        function validateQuestion(question) {
+            const value = surveyState.formData[question.key];
+            
+            if (question.required) {
+                if (question.type === 'text' || question.type === 'number' || question.type === 'money') {
+                    if (!value || value.toString().trim() === '') {
+                        return false;
+                    }
+                } else if (question.type === 'radio') {
+                    if (!value) {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
+        }
+
+        function nextStep() {
+            const currentQ = allQuestions[surveyState.currentStep];
+            
+            if (currentQ.type !== 'section_intro' && currentQ.type !== 'completion') {
+                if (!currentQ.conditional || currentQ.conditional(surveyState.formData)) {
+                    if (!validateQuestion(currentQ)) {
+                        alert('필수 항목입니다. 답변을 입력해주세요.');
+                        return;
+                    }
+                }
+            }
+            
+            if (surveyState.currentStep < allQuestions.length - 1) {
+                surveyState.currentStep++;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                render();
+            }
+        }
+
+        function prevStep() {
+            if (surveyState.currentStep > 0) {
+                surveyState.currentStep--;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                render();
+            }
+        }
+
+        async function submitStage() {
+            saveData();
+            
+            const submitData = {
+                timestamp: new Date().toISOString(),
+                phoneNumber: surveyState.phoneNumber,
+                stage: 8,
+                ...surveyState.formData,
+                completed_stage_8: true,
+                all_stages_completed: true
+            };
+
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(submitData)
+                });
+
+                surveyState.formData.completed_stage_8 = true;
+                surveyState.formData.all_stages_completed = true;
+                saveData();
+
+                alert('🎉 축하합니다!\n\n전체 8단계 마늘 생산비 조사가 완료되었습니다!\n소중한 시간 내어 참여해주셔서 감사합니다.');
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error('제출 오류:', error);
+                alert('✅ 8단계가 저장되었습니다!\n\n전체 조사가 완료되었습니다!');
+                window.location.href = 'index.html';
+            }
+        }
+
+        const allQuestions = [
+            { 
+                id: 0, 
+                type: 'section_intro', 
+                title: '마늘 생산비 조사', 
+                subtitle: '8단계: 수확 및 판매 (마지막!)', 
+                question: '수확 작업과 판매 정보 조사', 
+                description: '굴취수확, 건조, 선별, 포장 및 판매 정보를 조사합니다. 약 7분 소요됩니다.' 
+            },
+            
+            // ========== 굴취수확 ==========
+            { 
+                id: 1, 
+                section: '굴취수확', 
+                type: 'radio', 
+                question: '마늘 굴취수확은 어떤 방식으로 하셨습니까?', 
+                helper: '마늘 뽑기 작업', 
+                options: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'], 
+                key: 'harvest_method', 
+                required: true 
+            },
+            { 
+                id: 2, 
+                section: '굴취수확', 
+                type: 'money', 
+                question: '굴취수확 위탁 비용은 얼마입니까?', 
+                helper: '작업 인건비', 
+                key: 'harvest_outsource_cost', 
+                conditional: (data) => data.harvest_method === '위탁 (남에게 맡김)' 
+            },
+            { 
+                id: 3, 
+                section: '굴취수확', 
+                type: 'money', 
+                question: '굴취수확 작업 인건비는 얼마입니까?', 
+                helper: '고용 인력 임금', 
+                key: 'harvest_labor_cost', 
+                conditional: (data) => data.harvest_method === '자가 작업 (직접 함)' 
+            },
+            { 
+                id: 4, 
+                section: '굴취수확', 
+                type: 'number', 
+                question: '총 수확량은 얼마입니까?', 
+                helper: '수확한 마늘의 총 무게 (선택사항)', 
+                key: 'total_harvest_amount', 
+                unit: 'kg', 
+                required: false 
+            },
+            
+            // ========== 건조 ==========
+            { 
+                id: 5, 
+                section: '건조', 
+                type: 'radio', 
+                question: '마늘은 어떤 방법으로 건조하셨습니까?', 
+                helper: '수확 후 말리기', 
+                options: ['건조장 위탁', '선풍기 사용', '수확 후 바로 출하', '건조 안함'], 
+                key: 'drying_method', 
+                required: true 
+            },
+            { 
+                id: 6, 
+                section: '건조', 
+                type: 'money', 
+                question: '건조에 사용한 비용은 얼마입니까?', 
+                helper: '건조장 위탁료, 전기료 등', 
+                key: 'drying_cost', 
+                conditional: (data) => data.drying_method === '건조장 위탁' || data.drying_method === '선풍기 사용' 
+            },
+            
+            // ========== 줄기제거 ==========
+            { 
+                id: 7, 
+                section: '줄기제거', 
+                type: 'radio', 
+                question: '마늘 줄기제거(절단)는 어떤 방식으로 하셨습니까?', 
+                helper: '마늘대 자르기', 
+                options: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '줄기 제거 안함'], 
+                key: 'stem_removal_method', 
+                required: true 
+            },
+            { 
+                id: 8, 
+                section: '줄기제거', 
+                type: 'money', 
+                question: '줄기제거 위탁 비용은 얼마입니까?', 
+                helper: '작업 인건비', 
+                key: 'stem_removal_outsource_cost', 
+                conditional: (data) => data.stem_removal_method === '위탁 (남에게 맡김)' 
+            },
+            { 
+                id: 9, 
+                section: '줄기제거', 
+                type: 'money', 
+                question: '줄기제거 작업 인건비는 얼마입니까?', 
+                helper: '고용 인력 임금', 
+                key: 'stem_removal_labor_cost', 
+                conditional: (data) => data.stem_removal_method === '자가 작업 (직접 함)' 
+            },
+            
+            // ========== 선별 ==========
+            { 
+                id: 10, 
+                section: '선별', 
+                type: 'radio', 
+                question: '마늘 선별은 어떤 방식으로 하셨습니까?', 
+                helper: '크기별, 등급별 분류', 
+                options: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '선별 안함'], 
+                key: 'sorting_method', 
+                required: true 
+            },
+            { 
+                id: 11, 
+                section: '선별', 
+                type: 'money', 
+                question: '선별 위탁 비용은 얼마입니까?', 
+                helper: '작업 인건비', 
+                key: 'sorting_outsource_cost', 
+                conditional: (data) => data.sorting_method === '위탁 (남에게 맡김)' 
+            },
+            { 
+                id: 12, 
+                section: '선별', 
+                type: 'money', 
+                question: '선별 작업 인건비는 얼마입니까?', 
+                helper: '고용 인력 임금', 
+                key: 'sorting_labor_cost', 
+                conditional: (data) => data.sorting_method === '자가 작업 (직접 함)' 
+            },
+            
+            // ========== 포장 ==========
+            { 
+                id: 13, 
+                section: '포장', 
+                type: 'radio', 
+                question: '마늘 포장 작업을 하셨습니까?', 
+                helper: '망, 박스 등 포장', 
+                options: ['예, 했습니다', '아니오, 안 했습니다'], 
+                key: 'packaging', 
+                required: true 
+            },
+            { 
+                id: 14, 
+                section: '포장', 
+                type: 'money', 
+                question: '포장 총 비용은 얼마입니까?', 
+                helper: '포장재 + 인건비', 
+                key: 'packaging_total_cost', 
+                conditional: (data) => data.packaging === '예, 했습니다' 
+            },
+            
+            // ========== 판매 ==========
+            { 
+                id: 15, 
+                section: '판매', 
+                type: 'radio', 
+                question: '판매 방식은 무엇입니까?', 
+                helper: '어떤 방식으로 판매하셨나요? (1단계에서 선택한 방식 중 택1)', 
+                options: ['산지 유통인/수집상 대상 판매', '농협 공판장/도매시장 경매', '계약 재배 및 출하', '가공업체 대상 판매', '직접 판매(장터/온라인/택배 등)', '판매 안함'], 
+                key: 'sales_method', 
+                required: true 
+            },
+            { 
+                id: 16, 
+                section: '판매', 
+                type: 'number', 
+                question: '판매량은 얼마입니까?', 
+                helper: '실제 판매한 마늘의 무게', 
+                key: 'sales_quantity', 
+                unit: 'kg', 
+                required: true,
+                conditional: (data) => data.sales_method !== '판매 안함'
+            },
+            { 
+                id: 17, 
+                section: '판매', 
+                type: 'money', 
+                question: '총 판매액은 얼마입니까?', 
+                helper: '판매로 받은 총 금액', 
+                key: 'sales_amount', 
+                required: true,
+                conditional: (data) => data.sales_method !== '판매 안함'
+            },
+            { 
+                id: 18, 
+                section: '판매', 
+                type: 'money', 
+                question: '출하 비용은 얼마입니까?', 
+                helper: '운송비, 택배비, 포장비 등', 
+                key: 'shipping_cost',
+                conditional: (data) => data.sales_method !== '판매 안함'
+            },
+            { 
+                id: 19, 
+                section: '판매', 
+                type: 'text', 
+                question: '출하처는 어디입니까?', 
+                helper: '예: 농협, 도매시장, 직거래 등', 
+                key: 'buyer',
+                conditional: (data) => data.sales_method !== '판매 안함'
+            },
+            { 
+                id: 20, 
+                section: '판매', 
+                type: 'text', 
+                question: '비고 사항이 있으십니까?', 
+                helper: '특이사항이나 추가 정보 (선택)', 
+                key: 'sales_note',
+                required: false,
+                conditional: (data) => data.sales_method !== '판매 안함'
+            },
+            
+            // ========== 완료 ==========
+            { 
+                id: 21, 
+                type: 'completion', 
+                title: '전체 조사 완료! 🎉', 
+                question: '마늘 생산비 조사가 모두 완료되었습니다!' 
+            }
+        ];
+
+        function render() {
+            const app = document.getElementById('app');
+            const savedPhone = localStorage.getItem('garlic_survey_phone');
+            
+            if (!savedPhone) {
+                app.innerHTML = `
+                    <div class="min-h-screen flex items-center justify-center p-4">
+                        <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+                            <div class="bg-orange-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                                <span class="text-4xl">⚠️</span>
+                            </div>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">로그인이 필요합니다</h2>
+                            <p class="text-gray-600 mb-6">먼저 메인 화면에서 전화번호로 로그인해주세요.</p>
+                            <a href="index.html" class="inline-block px-6 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700">
+                                메인 화면으로 이동
+                            </a>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            if (!surveyState.phoneNumber) {
+                surveyState.phoneNumber = savedPhone;
+                loadData();
+            }
+
+            const currentQ = allQuestions[surveyState.currentStep];
+            const totalSteps = allQuestions.length;
+            const progress = ((surveyState.currentStep + 1) / totalSteps) * 100;
+
+            if (currentQ.conditional && !currentQ.conditional(surveyState.formData)) {
+                if (surveyState.currentStep < allQuestions.length - 1) {
+                    surveyState.currentStep++;
+                    render();
+                } else if (surveyState.currentStep > 0) {
+                    surveyState.currentStep--;
+                    render();
+                }
+                return;
+            }
+
+            if (currentQ.type === 'completion') {
+                const isAlreadySubmitted = surveyState.formData.completed_stage_8;
+                
+                app.innerHTML = `
+                    <div class="min-h-screen flex items-center justify-center p-4">
+                        <div class="max-w-2xl w-full bg-white rounded-lg shadow-lg p-8 text-center space-y-6 fade-in">
+                            <div class="bg-gradient-to-r from-orange-100 to-red-100 rounded-full w-24 h-24 flex items-center justify-center mx-auto">
+                                <span class="text-5xl">🎉</span>
+                            </div>
+                            <h2 class="text-3xl font-bold text-gray-800">${currentQ.title}</h2>
+                            <p class="text-gray-600 text-lg">${currentQ.question}</p>
+                            
+                            ${isAlreadySubmitted ? `
+                                <div class="bg-orange-50 border-l-4 border-orange-400 p-4 rounded text-left">
+                                    <p class="text-sm text-gray-700">
+                                        ✅ <strong>이미 제출된 단계입니다</strong><br>
+                                        수정 사항이 있다면 "다시 제출하기" 버튼을 눌러주세요.
+                                    </p>
+                                </div>
+                            ` : ''}
+                            
+                            <div class="bg-blue-50 p-6 rounded-lg text-left">
+                                <h3 class="font-bold text-gray-800 mb-3">📋 입력하신 정보</h3>
+                                <div class="text-sm space-y-1 text-gray-700">
+                                    <p><strong>굴취수확 방법:</strong> ${surveyState.formData.harvest_method || '-'}</p>
+                                    <p><strong>총 수확량:</strong> ${surveyState.formData.total_harvest_amount ? surveyState.formData.total_harvest_amount + 'kg' : '미입력'}</p>
+                                    <p><strong>건조 방법:</strong> ${surveyState.formData.drying_method || '-'}</p>
+                                    <p><strong>판매 방식:</strong> ${surveyState.formData.sales_method || '-'}</p>
+                                    ${surveyState.formData.sales_method !== '판매 안함' ? `
+                                        <p><strong>판매량:</strong> ${surveyState.formData.sales_quantity ? surveyState.formData.sales_quantity + 'kg' : '-'}</p>
+                                        <p><strong>판매액:</strong> ${surveyState.formData.sales_amount ? surveyState.formData.sales_amount + '원' : '-'}</p>
+                                        <p><strong>출하처:</strong> ${surveyState.formData.buyer || '-'}</p>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-400 p-4 rounded text-left">
+                                <p class="text-sm text-gray-700">
+                                    🎉 <strong>축하합니다!</strong><br>
+                                    전체 8단계 마늘 생산비 조사가 완료되었습니다!<br>
+                                    소중한 시간 내어 참여해주셔서 감사합니다.
+                                </p>
+                            </div>
+                            
+                            <div class="flex gap-4 justify-center flex-wrap">
+                                <button onclick="prevStep()" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">
+                                    ← 수정하기
+                                </button>
+                                <button onclick="submitStage()" class="px-6 py-3 ${isAlreadySubmitted ? 'bg-orange-600 hover:bg-orange-700' : 'bg-orange-600 hover:bg-orange-700'} text-white rounded-lg font-medium">
+                                    ${isAlreadySubmitted ? '다시 제출하기' : '제출하기'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            if (currentQ.type === 'section_intro') {
+                app.innerHTML = `
+                    <div class="min-h-screen flex items-center justify-center p-4">
+                        <div class="max-w-2xl w-full bg-white rounded-lg shadow-lg p-8 text-center space-y-6 fade-in">
+                            <div class="bg-gradient-to-r from-orange-100 to-red-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto">
+                                <span class="text-4xl">🌾</span>
+                            </div>
+                            <h1 class="text-3xl font-bold text-gray-800">${currentQ.title}</h1>
+                            <p class="text-xl text-orange-600 font-medium">${currentQ.subtitle}</p>
+                            <p class="text-lg text-gray-700">${currentQ.question}</p>
+                            <p class="text-gray-600">${currentQ.description}</p>
+                            
+                            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded text-left">
+                                <p class="text-sm text-gray-700">
+                                    🎯 <strong>마지막 단계입니다!</strong><br>
+                                    조금만 더 힘내세요. 거의 다 왔습니다!
+                                </p>
+                            </div>
+                            
+                            <div class="flex gap-4 justify-center">
+                                <a href="index.html" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">
+                                    ← 메인으로
+                                </a>
+                                <button onclick="nextStep()" class="px-8 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 text-lg">
+                                    시작하기 →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            let questionHTML = renderQuestionContent(currentQ);
+
+            app.innerHTML = `
+                <div class="min-h-screen p-4 survey-container">
+                    <div class="max-w-3xl mx-auto">
+                        <div class="bg-white rounded-t-lg shadow-lg p-4 md:p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <div>
+                                    <h1 class="text-lg md:text-2xl font-bold text-gray-800">마늘 생산비 조사</h1>
+                                    <p class="text-sm text-orange-600">8단계: 수확 및 판매 (마지막!)</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <a href="index.html" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300">메인</a>
+                                    <button onclick="manualSave()" class="px-3 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700">💾 저장</button>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs md:text-sm font-medium text-gray-700">진행률: ${Math.round(progress)}%</span>
+                                <span class="text-xs md:text-sm text-gray-600">${surveyState.currentStep + 1} / ${totalSteps}</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-orange-600 h-2 rounded-full transition-all duration-300" style="width: ${progress}%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white shadow-lg p-4 md:p-8 space-y-6 question-card fade-in">
+                            ${currentQ.section ? `<div class="text-sm text-orange-600 font-medium">📌 ${currentQ.section}</div>` : ''}
+                            <h2 class="text-xl md:text-2xl font-bold text-gray-800">
+                                ${currentQ.question}
+                                ${currentQ.required ? '<span class="text-red-500 ml-1">*</span>' : '<span class="text-gray-500 ml-1 text-sm">(선택)</span>'}
+                            </h2>
+                            ${currentQ.helper ? `<div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded"><p class="text-sm text-gray-700">💡 ${currentQ.helper}</p></div>` : ''}
+                            ${questionHTML}
+                        </div>
+                        
+                        <div class="bg-white rounded-b-lg shadow-lg p-4 md:p-6 flex justify-between">
+                            <button onclick="prevStep()" ${surveyState.currentStep === 0 ? 'disabled' : ''} 
+                                class="px-4 md:px-6 py-3 rounded-lg font-medium ${surveyState.currentStep === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-600 text-white hover:bg-gray-700'}">
+                                ← 이전
+                            </button>
+                            <button onclick="nextStep()" class="px-4 md:px-6 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700">
+                                다음 →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderQuestionContent(question) {
+            const value = surveyState.formData[question.key];
+
+            switch (question.type) {
+                case 'text':
+                    return `<input type="text" value="${value || ''}" onchange="handleAnswer('${question.key}', this.value)" placeholder="${question.helper || '입력해주세요'}" class="w-full p-3 md:p-4 text-base md:text-lg border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none" />`;
+
+                case 'number':
+                case 'money':
+                    return `
+                        <div class="flex items-center space-x-3">
+                            <input type="number" value="${value || ''}" onchange="handleAnswer('${question.key}', this.value)" min="0" placeholder="0" 
+                                class="flex-1 p-3 md:p-4 text-base md:text-lg border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none" />
+                            <span class="text-lg md:text-xl font-medium text-gray-600">${question.unit || '원'}</span>
+                        </div>
+                        ${question.type === 'money' ? `<button onclick="handleAnswer('${question.key}', '0'); render();" class="text-sm text-orange-600 hover:underline">비용이 안 들었어요 (0원)</button>` : ''}
+                    `;
+
+                case 'radio':
+                    return `
+                        <div class="space-y-3">
+                            ${question.options.map(option => `
+                                <label class="flex items-center space-x-3 p-3 md:p-4 border-2 rounded-lg cursor-pointer hover:bg-orange-50 transition-colors ${value === option ? 'border-orange-500 bg-orange-50' : 'border-gray-300'}">
+                                    <input type="radio" name="${question.key}" class="w-5 h-5" ${value === option ? 'checked' : ''} onchange="handleAnswer('${question.key}', '${option}'); render();" />
+                                    <span class="text-base md:text-lg">${option}</span>
+                                </label>
+                            `).join('')}
+                        </div>
+                    `;
+
+                default:
+                    return '<p class="text-gray-500">알 수 없는 질문 유형입니다.</p>';
+            }
+        }
+
+        render();
+    </script>
+</body>
+</html>
