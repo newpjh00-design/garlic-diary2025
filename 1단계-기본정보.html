@@ -40,13 +40,21 @@
 
         function saveData() {
             if (surveyState.phoneNumber) {
+                // 기존 데이터 불러오기
+                const existingData = localStorage.getItem(`garlic_survey_${surveyState.phoneNumber}`);
+                const parsed = existingData ? JSON.parse(existingData) : {};
+                
                 const dataToSave = {
                     ...surveyState.formData,
                     savedAt: new Date().toISOString(),
                     stage: surveyState.stage,
                     phoneNumber: surveyState.phoneNumber
                 };
-                localStorage.setItem(`garlic_survey_${surveyState.phoneNumber}`, JSON.stringify(dataToSave));
+                
+                // 기존 데이터와 병합
+                Object.assign(parsed, dataToSave);
+                
+                localStorage.setItem(`garlic_survey_${surveyState.phoneNumber}`, JSON.stringify(parsed));
             }
         }
 
