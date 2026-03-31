@@ -117,8 +117,8 @@
                     console.log('✅ 서버 동기화 완료');
                     return merged;
                 }
-                const d = result.diag || {};
-                window._syncStatus = '진단: 받은전화=[' + (d.phoneReceived||'?') + '] 시트존재=' + d.s1Exists + ' 행수=' + d.s1Rows + ' 시트첫전화=[' + (d.s1FirstPhone||'?') + ']';
+                // 서버 응답 원문 표시
+                window._syncStatus = '서버응답: ' + JSON.stringify(result).substring(0, 300);
             } catch (error) {
                 console.error('서버 로드 실패:', error);
                 window._syncStatus = '⚠️ 서버 연결 실패';
