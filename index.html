@@ -113,11 +113,11 @@
                     const local = JSON.parse(localStorage.getItem(`garlic_survey_${phoneNumber}`) || '{}');
                     const merged = Object.assign({}, flattenData(local), flat);
                     localStorage.setItem(`garlic_survey_${phoneNumber}`, JSON.stringify(merged));
-                    window._syncStatus = '✅ 동기화 완료';
+                    window._syncStatus = '✅ 완료: 이름=' + (flat.name||'없음') + ', 1단계=' + (flat.completed_stage_1 ? 'O' : 'X') + ', 총' + Object.keys(flat).length + '개';
                     console.log('✅ 서버 동기화 완료');
                     return merged;
                 }
-                window._syncStatus = 'ℹ️ 서버에 저장된 데이터 없음';
+                window._syncStatus = 'ℹ️ 서버응답받음 키수=' + Object.keys(result.data||{}).length + ' / 전화=' + (result.data && result.data.phoneNumber ? result.data.phoneNumber : '없음');
             } catch (error) {
                 console.error('서버 로드 실패:', error);
                 window._syncStatus = '⚠️ 서버 연결 실패';
