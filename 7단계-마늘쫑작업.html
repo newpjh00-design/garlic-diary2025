@@ -480,7 +480,7 @@
                                                 💵 판매단가 (1kg당 원) <span class="text-red-500">*</span>
                                             </label>
                                             <input 
-                                                type="number" 
+                                                type="text" inputmode="numeric" 
                                                 id="unit_price"
                                                 min="0"
                                                 placeholder="kg당 판매 가격"
@@ -495,7 +495,7 @@
                                                 ⚖️ 판매량 (kg) <span class="text-red-500">*</span>
                                             </label>
                                             <input 
-                                                type="number" 
+                                                type="text" inputmode="numeric" 
                                                 id="sales_amount"
                                                 min="0"
                                                 step="0.1"
@@ -513,9 +513,9 @@
                                         💰 자재비 (원)
                                     </label>
                                     <input 
-                                        type="number" 
+                                        type="text" inputmode="numeric" 
                                         id="material_cost"
-                                        value="${editingRecord ? editingRecord.material_cost : ''}"
+                                        value="${editingRecord ? (parseInt(editingRecord.material_cost)||0).toLocaleString('ko-KR') : ''}"
                                         min="0"
                                         placeholder="자재 구입 비용"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-pink-500 focus:outline-none"
@@ -529,9 +529,9 @@
                                         👷 인건비 (원)
                                     </label>
                                     <input 
-                                        type="number" 
+                                        type="text" inputmode="numeric" 
                                         id="labor_cost"
-                                        value="${editingRecord ? editingRecord.labor_cost : ''}"
+                                        value="${editingRecord ? (parseInt(editingRecord.labor_cost)||0).toLocaleString('ko-KR') : ''}"
                                         min="0"
                                         placeholder="작업 인건비"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-pink-500 focus:outline-none"
