@@ -434,9 +434,9 @@
                                     </label>
                                     <div class="flex items-center space-x-3">
                                         <input 
-                                            type="number" 
+                                            type="text" inputmode="numeric" 
                                             id="material_cost"
-                                            value="${editingRecord ? editingRecord.material_cost : ''}"
+                                            value="${editingRecord ? (parseInt(editingRecord.material_cost)||0).toLocaleString('ko-KR') : ''}"
                                             min="0"
                                             placeholder="0"
                                             class="flex-1 p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none"
@@ -452,7 +452,7 @@
                                     </label>
                                     <div class="flex items-center space-x-3">
                                         <input 
-                                            type="number" 
+                                            type="text" inputmode="numeric" 
                                             id="labor_cost"
                                             value="${editingRecord ? (editingRecord.labor_cost || '') : ''}"
                                             min="0"
