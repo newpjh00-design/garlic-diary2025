@@ -44,6 +44,20 @@
             } catch(e) { /* 로컬 데이터 사용 */ }
         }
 
+
+        // ★ 인원 입력 필드 표시/숨김
+        function updateWorkerFields(method) {
+            const section = document.getElementById('workerSection');
+            const outDiv  = document.getElementById('outsourceWorkers');
+            const selfDiv = document.getElementById('selfWorkers');
+            if (!section) return;
+            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가'].includes(method);
+            const showSelf = ['자가 작업 (직접 함)', '위탁+자가'].includes(method);
+            outDiv.style.display  = showOut  ? 'block' : 'none';
+            selfDiv.style.display = showSelf ? 'block' : 'none';
+            section.style.display = (showOut || showSelf) ? 'block' : 'none';
+        }
+
         // ★ 천단위 콤마 유틸리티
         function fmtMoney(v) {
             const n = parseInt(String(v||'').replace(/[^0-9]/g,''))||0;
@@ -57,11 +71,11 @@
 
         // 작업 종류별 방법 옵션
         const methodOptions = {
-            '웃거름(추비)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
-            '복토': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
-            '김매기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
-            '농약살포(살균제/살충제/제초제)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
-            '영양제': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
+            '웃거름(추비)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
+            '복토': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
+            '김매기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
+            '농약살포(살균제/살충제/제초제)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
+            '영양제': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
             '관수(물주기)': ['스프링클러', '점적관수', '호스(수동)']
         };
 
@@ -281,7 +295,16 @@
                                     <span class="text-sm text-gray-500">${record.date}</span>
                                 </div>
                                 <div class="text-sm text-gray-700 space-y-1">
-                                    ${record.method ? `<p>🔧 작업방법: ${record.method}</p>` : ''}
+                                    ${record.method ? `<p>🔧 작업방법: ${record.method}</p>
+                                    ${(()=>{
+                                        const m = record.method||'';
+                                        let w = [];
+                                        if(['위탁 (남에게 맡김)','위탁+자가'].includes(m) && (record.outsource_male||record.outsource_female))
+                                            w.push('위탁: 남'+( record.outsource_male||0)+'명 여'+(record.outsource_female||0)+'명');
+                                        if(['자가 작업 (직접 함)','위탁+자가'].includes(m) && (record.self_male||record.self_female))
+                                            w.push('자가: 남'+(record.self_male||0)+'명 여'+(record.self_female||0)+'명');
+                                        return w.length ? '<p>👷 인원: '+w.join(' / ')+'</p>' : '';
+                                    })()}` : ''}
                                     <p>💰 자재비: ${parseInt(record.material_cost).toLocaleString()}원</p>
                                     ${record.labor_cost ? `<p>👷 인건비: ${parseInt(record.labor_cost).toLocaleString()}원</p>` : ''}
                                     ${record.memo ? `<p>📝 ${record.memo}</p>` : ''}
@@ -510,6 +533,7 @@
                         const methodSelect = document.getElementById('method');
                         if (methodSelect) methodSelect.value = editingRecord.method;
                     }
+                    updateWorkerFields(editingRecord.method||'');
                 }, 50);
             }
         }
@@ -534,6 +558,14 @@
                 }
             }
 
+
+            const workerData = {
+                outsource_male:   document.getElementById('outsource_male')?.value   || '',
+                outsource_female: document.getElementById('outsource_female')?.value || '',
+                self_male:        document.getElementById('self_male')?.value        || '',
+                self_female:      document.getElementById('self_female')?.value      || '',
+            };
+            Object.assign(formData, workerData);
             addOrUpdateRecord(formData);
         }
 
