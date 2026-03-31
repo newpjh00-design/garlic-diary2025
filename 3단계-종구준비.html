@@ -41,6 +41,20 @@
             } catch(e) { /* 로컬 데이터 사용 */ }
         }
 
+
+        // ★ 인원 입력 필드 표시/숨김
+        function updateWorkerFields(method) {
+            const section = document.getElementById('workerSection');
+            const outDiv  = document.getElementById('outsourceWorkers');
+            const selfDiv = document.getElementById('selfWorkers');
+            if (!section) return;
+            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가'].includes(method);
+            const showSelf = ['자가 작업 (직접 함)', '위탁+자가'].includes(method);
+            outDiv.style.display  = showOut  ? 'block' : 'none';
+            selfDiv.style.display = showSelf ? 'block' : 'none';
+            section.style.display = (showOut || showSelf) ? 'block' : 'none';
+        }
+
         // ★ 천단위 콤마 유틸리티
         function fmtMoney(v) {
             const n = parseInt(String(v||'').replace(/[^0-9]/g,''))||0;
@@ -55,8 +69,8 @@
         // 작업 종류별 방법 옵션
         const methodOptions = {
             '씨마늘 확보': [], // 구입처만 표시
-            '씨마늘 소독': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
-            '쪽분리': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)']
+            '씨마늘 소독': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
+            '쪽분리': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가']
         };
 
         function updateFormFields(workType) {
@@ -240,6 +254,14 @@
                 }
             }
 
+
+            const workerData = {
+                outsource_male:   document.getElementById('outsource_male')?.value   || '',
+                outsource_female: document.getElementById('outsource_female')?.value || '',
+                self_male:        document.getElementById('self_male')?.value        || '',
+                self_female:      document.getElementById('self_female')?.value      || '',
+            };
+            Object.assign(formData, workerData);
             addOrUpdateRecord(formData);
         }
 
@@ -322,7 +344,16 @@
                                 </div>
                                 <div class="text-sm text-gray-700 space-y-1">
                                     ${record.source ? `<p>📍 구입처: ${record.source}</p>` : ''}
-                                    ${record.method ? `<p>🔧 작업방법: ${record.method}</p>` : ''}
+                                    ${record.method ? `<p>🔧 작업방법: ${record.method}</p>
+                                    ${(()=>{
+                                        const m = record.method||'';
+                                        let w = [];
+                                        if(['위탁 (남에게 맡김)','위탁+자가'].includes(m) && (record.outsource_male||record.outsource_female))
+                                            w.push('위탁: 남'+( record.outsource_male||0)+'명 여'+(record.outsource_female||0)+'명');
+                                        if(['자가 작업 (직접 함)','위탁+자가'].includes(m) && (record.self_male||record.self_female))
+                                            w.push('자가: 남'+(record.self_male||0)+'명 여'+(record.self_female||0)+'명');
+                                        return w.length ? '<p>👷 인원: '+w.join(' / ')+'</p>' : '';
+                                    })()}` : ''}
                                     ${record.amount ? `<p>⚖️ 사용량: ${record.amount}</p>` : ''}
                                     <p>💰 자재비: ${parseInt(record.material_cost).toLocaleString()}원</p>
                                     ${record.labor_cost && parseInt(record.labor_cost) > 0 ? `<p>👷 인건비: ${parseInt(record.labor_cost).toLocaleString()}원</p>` : ''}
@@ -585,6 +616,7 @@
                         const methodSelect = document.getElementById('method');
                         if (methodSelect) methodSelect.value = editingRecord.method;
                     }
+                    updateWorkerFields(editingRecord.method||'');
                 }, 50);
             }
         }
