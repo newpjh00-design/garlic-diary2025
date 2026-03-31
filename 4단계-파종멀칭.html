@@ -41,6 +41,20 @@
             } catch(e) { /* 로컬 데이터 사용 */ }
         }
 
+
+        // ★ 인원 입력 필드 표시/숨김
+        function updateWorkerFields(method) {
+            const section = document.getElementById('workerSection');
+            const outDiv  = document.getElementById('outsourceWorkers');
+            const selfDiv = document.getElementById('selfWorkers');
+            if (!section) return;
+            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가'].includes(method);
+            const showSelf = ['자가 작업 (직접 함)', '위탁+자가'].includes(method);
+            outDiv.style.display  = showOut  ? 'block' : 'none';
+            selfDiv.style.display = showSelf ? 'block' : 'none';
+            section.style.display = (showOut || showSelf) ? 'block' : 'none';
+        }
+
         // ★ 천단위 콤마 유틸리티
         function fmtMoney(v) {
             const n = parseInt(String(v||'').replace(/[^0-9]/g,''))||0;
@@ -54,11 +68,11 @@
 
         // 작업 종류별 방법 옵션
         const methodOptions = {
-            '고랑(배수로) 만들기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
-            '파종': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
+            '고랑(배수로) 만들기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
+            '파종': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
             '관수(물주기)': ['스프링클러', '점적관수', '호스(수동)'],
-            '비닐피복(멀칭)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)'],
-            '유인작업': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)']
+            '비닐피복(멀칭)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
+            '유인작업': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가']
         };
 
         function updateMethodOptions(workType) {
@@ -218,6 +232,14 @@
                 return;
             }
 
+
+            const workerData = {
+                outsource_male:   document.getElementById('outsource_male')?.value   || '',
+                outsource_female: document.getElementById('outsource_female')?.value || '',
+                self_male:        document.getElementById('self_male')?.value        || '',
+                self_female:      document.getElementById('self_female')?.value      || '',
+            };
+            Object.assign(formData, workerData);
             addOrUpdateRecord(formData);
         }
 
@@ -444,6 +466,7 @@
                                     <select 
                                         id="method"
                                         required
+                                        onchange="updateWorkerFields(this.value)"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none"
                                     >
                                         <option value="">작업 종류를 먼저 선택하세요</option>
@@ -523,6 +546,7 @@
                     if (methodSelect && editingRecord.method) {
                         methodSelect.value = editingRecord.method;
                     }
+                    updateWorkerFields(editingRecord.method||'');
                 }, 50);
             }
         }
