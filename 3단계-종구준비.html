@@ -97,6 +97,8 @@ async function syncFromServer_old_disabled(phone) {
                 const methodSelect = document.getElementById('method');
                 methodSelect.innerHTML = '<option value=""></option>' + 
                     methodOptions[workType].map(option => `<option value="${option}">${option}</option>`).join('');
+                methodSelect.onchange = function(){ updateWorkerFields(this.value); };
+                methodSelect.onchange = function(){ updateWorkerFields(this.value); };
             }
         }
 
@@ -523,6 +525,7 @@ async function syncFromServer_old_disabled(phone) {
                                     </label>
                                     <select 
                                         id="method"
+                                        onchange="updateWorkerFields(this.value)"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
                                     >
                                         <option value=""></option>
