@@ -56,11 +56,19 @@
             localStorage.setItem(key, JSON.stringify(existing));
         }
 
+        // ★ 중첩된 formData 구조를 평탄화 (서버 저장 시 formData가 안에 들어가는 문제 해결)
+        function flattenData(parsed) {
+            if (!parsed) return {};
+            const result = Object.assign({}, parsed.formData || {}, parsed);
+            delete result.formData;
+            return result;
+        }
+
         function loadData() {
             if (!surveyState.phoneNumber) return false;
             const saved = localStorage.getItem(`garlic_survey_${surveyState.phoneNumber}`);
             if (saved) {
-                surveyState.formData = JSON.parse(saved);
+                surveyState.formData = flattenData(JSON.parse(saved));
                 return true;
             }
             return false;
@@ -74,14 +82,15 @@
                 const result = await resp.json();
                 if (result.success && result.data && Object.keys(result.data).length > 0) {
                     const key = `garlic_survey_${phone}`;
-                    const local = JSON.parse(localStorage.getItem(key)||'{}');
-                    // 서버 데이터로 로컬 병합 (서버 우선)
-                    const merged = Object.assign({}, local, result.data);
+                    const local = JSON.parse(localStorage.getItem(key)||"{}");
+                    // ★ 서버 데이터 평탄화 후 병합
+                    const flatServer = flattenData(result.data);
+                    const merged = Object.assign({}, flattenData(local), flatServer);
                     localStorage.setItem(key, JSON.stringify(merged));
-                    console.log('✅ 서버 데이터 동기화 완료');
+                    console.log("✅ 서버 데이터 동기화 완료");
                 }
             } catch(e) {
-                console.log('ℹ️ 서버 동기화 실패, 로컬 데이터 사용');
+                console.log("ℹ️ 서버 동기화 실패, 로컬 데이터 사용");
             }
         }
 
@@ -179,10 +188,16 @@
                 });
             } catch(e) { /* no-cors는 항상 성공으로 처리 */ }
 
-            // localStorage 저장 (기존 데이터 병합)
+            // ★ localStorage 저장 - 플랫 구조 유지 (formData 중첩 방지)
             const key = `garlic_survey_${surveyState.phoneNumber}`;
-            const existing = JSON.parse(localStorage.getItem(key)||'{}');
-            Object.assign(existing, submitData);
+            const existing = flattenData(JSON.parse(localStorage.getItem(key)||'{}'));
+            const localData = Object.assign({}, surveyState.formData, {
+                phoneNumber: surveyState.phoneNumber,
+                stage: 1,
+                completed_stage_1: true,
+                timestamp: new Date().toISOString()
+            });
+            Object.assign(existing, localData);
             localStorage.setItem(key, JSON.stringify(existing));
 
             isSubmitting = false;
