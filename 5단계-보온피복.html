@@ -47,8 +47,8 @@
             const outDiv  = document.getElementById('outsourceWorkers');
             const selfDiv = document.getElementById('selfWorkers');
             if (!section) return;
-            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가'].includes(method);
-            const showSelf = ['자가 작업 (직접 함)', '위탁+자가'].includes(method);
+            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가', '위탁+자가 (함께 작업)'].includes(method);
+            const showSelf = ['자가 작업 (직접 함)', '위탁+자가', '위탁+자가 (함께 작업)'].includes(method);
             outDiv.style.display  = showOut  ? 'block' : 'none';
             selfDiv.style.display = showSelf ? 'block' : 'none';
             section.style.display = (showOut || showSelf) ? 'block' : 'none';
@@ -67,9 +67,9 @@
 
         // 작업 종류별 방법 옵션
         const methodOptions = {
-            '부직포 피복': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
-            '보온덮개/보온터널 설치': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
-            '부직포/보온덮개/보온터널 제거': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가']
+            '부직포 피복': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
+            '보온덮개/보온터널 설치': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
+            '부직포/보온덮개/보온터널 제거': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가']
         };
 
         function updateMethodOptions(workType) {
