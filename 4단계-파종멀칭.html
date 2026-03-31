@@ -48,8 +48,8 @@
             const outDiv  = document.getElementById('outsourceWorkers');
             const selfDiv = document.getElementById('selfWorkers');
             if (!section) return;
-            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가'].includes(method);
-            const showSelf = ['자가 작업 (직접 함)', '위탁+자가'].includes(method);
+            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가', '위탁+자가 (함께 작업)'].includes(method);
+            const showSelf = ['자가 작업 (직접 함)', '위탁+자가', '위탁+자가 (함께 작업)'].includes(method);
             outDiv.style.display  = showOut  ? 'block' : 'none';
             selfDiv.style.display = showSelf ? 'block' : 'none';
             section.style.display = (showOut || showSelf) ? 'block' : 'none';
@@ -68,11 +68,11 @@
 
         // 작업 종류별 방법 옵션
         const methodOptions = {
-            '고랑(배수로) 만들기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
-            '파종': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
+            '고랑(배수로) 만들기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
+            '파종': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
             '관수(물주기)': ['스프링클러', '점적관수', '호스(수동)'],
-            '비닐피복(멀칭)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가'],
-            '유인작업': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가']
+            '비닐피복(멀칭)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
+            '유인작업': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가']
         };
 
         function updateMethodOptions(workType) {
