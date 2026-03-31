@@ -291,6 +291,9 @@
             };
 
             _isSubmitting = true;
+            // ★ 즉시 버튼 피드백
+            const submitBtn = document.getElementById('submitStageBtn');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '⏳ 저장 중...'; }
             try {
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
@@ -842,6 +845,7 @@
             if (!phone) { window.location.href = 'index.html'; return; }
             surveyState.phoneNumber = phone;
             await syncFromServer(phone);
+            loadData();  // ★ 서버 동기화 후 데이터 로드
             surveyState.view = 'intro';
             render();
         }
