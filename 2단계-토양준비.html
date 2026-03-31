@@ -51,8 +51,8 @@
             const outDiv  = document.getElementById('outsourceWorkers');
             const selfDiv = document.getElementById('selfWorkers');
             if (!section) return;
-            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가'].includes(method);
-            const showSelf = ['자가 작업 (직접 함)', '위탁+자가'].includes(method);
+            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가', '위탁+자가 (함께 작업)'].includes(method);
+            const showSelf = ['자가 작업 (직접 함)', '위탁+자가', '위탁+자가 (함께 작업)'].includes(method);
             outDiv.style.display  = showOut  ? 'block' : 'none';
             selfDiv.style.display = showSelf ? 'block' : 'none';
             section.style.display = (showOut || showSelf) ? 'block' : 'none';
@@ -469,6 +469,7 @@
                                         <option value="">선택하세요</option>
                                         <option value="위탁 (남에게 맡김)" ${editingRecord && editingRecord.method === '위탁 (남에게 맡김)' ? 'selected' : ''}>위탁 (남에게 맡김)</option>
                                         <option value="자가 작업 (직접 함)" ${editingRecord && editingRecord.method === '자가 작업 (직접 함)' ? 'selected' : ''}>자가 작업 (직접 함)</option>
+                                        <option value="위탁+자가" ${editingRecord && editingRecord.method === '위탁+자가' ? 'selected' : ''}>위탁+자가 (함께 작업)</option>
                                     </select>
                                 </div>
 
