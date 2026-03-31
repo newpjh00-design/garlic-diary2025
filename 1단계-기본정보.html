@@ -129,10 +129,15 @@
 
         function canMoveForward() { return isStepComplete(surveyState.currentStep); }
 
-        // ★ 버튼 상태만 업데이트 (전체 render 없이)
+        // ★ 버튼 상태 업데이트 - disabled 속성 대신 CSS 클래스로 처리 (더 안정적)
         function updateButtonState() {
             const btn = document.getElementById('nextBtn') || document.getElementById('submitBtn');
-            if (btn) btn.disabled = !canMoveForward();
+            if (!btn) return;
+            const ok = canMoveForward();
+            btn.style.opacity = ok ? '1' : '0.4';
+            btn.style.cursor = ok ? 'pointer' : 'not-allowed';
+            // disabled 속성 완전히 제거하고 nextStep에서 검증
+            btn.removeAttribute('disabled');
         }
 
         function nextStep() {
@@ -427,12 +432,12 @@
                                 ${isFirst?'disabled':''}>← 이전</button>
                         ${!isLast ? `
                             <button id="nextBtn" onclick="nextStep()"
-                                    class="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
-                                    ${!canMoveForward()?'disabled':''}>다음 →</button>
+                                    style="opacity:${!canMoveForward()?'0.4':'1'}; cursor:${!canMoveForward()?'not-allowed':'pointer'}"
+                                    class="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">다음 →</button>
                         ` : `
                             <button id="submitBtn" onclick="submitSurvey()"
-                                    class="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50"
-                                    ${!canMoveForward()?'disabled':''}>✓ 제출하기</button>
+                                    style="opacity:${!canMoveForward()?'0.4':'1'}; cursor:${!canMoveForward()?'not-allowed':'pointer'}"
+                                    class="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">✓ 제출하기</button>
                         `}
                     </div>
                 </div>
