@@ -95,8 +95,7 @@
             return result;
         }
 
-        async function loadFromServer(phoneNumber, showStatus) {
-            if (showStatus) showStatus('🔄 서버에서 데이터 불러오는 중...');
+        async function loadFromServer(phoneNumber) {
             try {
                 const response = await fetch(
                     `${SCRIPT_URL}?action=load&phone=${encodeURIComponent(phoneNumber)}`,
@@ -105,34 +104,19 @@
                 if (!response.ok) throw new Error(`서버 응답 오류: ${response.status}`);
                 const result = await response.json();
                 if (result.success && result.data && Object.keys(result.data).length > 1) {
-                    // ★ 서버 데이터 평탄화 후 localStorage 저장
                     const flat = flattenData(result.data);
                     const local = JSON.parse(localStorage.getItem(`garlic_survey_${phoneNumber}`) || '{}');
                     const merged = Object.assign({}, flattenData(local), flat);
                     localStorage.setItem(`garlic_survey_${phoneNumber}`, JSON.stringify(merged));
-                    if (showStatus) showStatus('✅ 동기화 완료');
                     console.log('✅ 서버에서 데이터 로드 성공');
                     return merged;
-                } else {
-                    if (showStatus) showStatus('ℹ️ 서버에 저장된 데이터 없음');
                 }
             } catch (error) {
-                if (showStatus) showStatus('⚠️ 동기화 실패 (로컬 데이터 사용)');
                 console.error('⚠️ 서버 데이터 로드 실패:', error);
             }
             const localData = localStorage.getItem(`garlic_survey_${phoneNumber}`);
             if (localData) return flattenData(JSON.parse(localData));
             return {};
-        }
-
-        // ★ 수동 동기화 버튼 클릭 시
-        async function manualSync() {
-            const phone = localStorage.getItem('garlic_survey_phone');
-            if (!phone) return;
-            const statusEl = document.getElementById('syncStatus');
-            const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg; };
-            await loadFromServer(phone, setStatus);
-            setTimeout(() => showMainPage(), 800);
         }
 
         // ==================== 로그인 ====================
@@ -157,9 +141,9 @@
             
             // 로그인 처리
             localStorage.setItem('garlic_survey_phone', phone);
-            
-            // 메인 페이지 로드
-            showLoading('데이터를 불러오는 중...');
+
+            // ★ 서버 동기화 후 메인 페이지 표시
+            showLoading('📡 저장된 데이터를 불러오는 중...<br><span style="font-size:0.85em;color:#888">잠시만 기다려주세요</span>');
             await showMainPage();
         }
 
@@ -183,7 +167,7 @@
             }
             
             // 서버에서 데이터 불러오기
-            const allData = await loadFromServer(phone, null);
+            const allData = await loadFromServer(phone);
             
             // 완료 상태 추출
             const completedStages = {
@@ -230,15 +214,6 @@
                             </button>
                         </div>
 
-                        <!-- ★ 동기화 버튼 -->
-                        <div class="mt-3">
-                            <button onclick="manualSync()"
-                                    class="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-300 text-blue-700 rounded-lg text-sm hover:bg-blue-100 transition-colors">
-                                🔄 다른 기기 데이터 불러오기
-                            </button>
-                            <span id="syncStatus" class="ml-3 text-sm text-gray-500"></span>
-                        </div>
-                        
                         <!-- 전체 진행률 -->
                         ${allData.name ? `
                         <div class="bg-white px-6 py-3 rounded-lg shadow inline-block mb-4">
@@ -583,7 +558,7 @@
             const phone = localStorage.getItem('garlic_survey_phone');
             if (phone) {
                 // 로그인된 사용자 → 메인 페이지
-                showLoading('데이터를 불러오는 중...');
+                showLoading('📡 저장된 데이터를 불러오는 중...<br><span style="font-size:0.85em;color:#888">잠시만 기다려주세요</span>');
                 await showMainPage();
             } else {
                 // 로그인 안된 사용자 → 로그인 화면
