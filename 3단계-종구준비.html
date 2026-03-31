@@ -506,9 +506,9 @@
                                         💰 자재비 (원)
                                     </label>
                                     <input 
-                                        type="number" 
+                                        type="text" inputmode="numeric" 
                                         id="material_cost"
-                                        value="${editingRecord ? editingRecord.material_cost : ''}"
+                                        value="${editingRecord ? (parseInt(editingRecord.material_cost)||0).toLocaleString('ko-KR') : ''}"
                                         min="0"
                                         placeholder="씨마늘 구입비, 소독약 비용 등"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
@@ -522,9 +522,9 @@
                                         👷 인건비 (원)
                                     </label>
                                     <input 
-                                        type="number" 
+                                        type="text" inputmode="numeric" 
                                         id="labor_cost"
-                                        value="${editingRecord ? editingRecord.labor_cost : ''}"
+                                        value="${editingRecord ? (parseInt(editingRecord.labor_cost)||0).toLocaleString('ko-KR') : ''}"
                                         min="0"
                                         placeholder="쪽분리, 소독 작업 인건비 등"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
