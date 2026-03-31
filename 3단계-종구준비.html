@@ -356,15 +356,15 @@ async function syncFromServer_old_disabled(phone) {
                                     ${(()=>{
                                         const m = record.method||'';
                                         let w = [];
-                                        if(['위탁 (남에게 맡김)','위탁+자가'].includes(m) && (record.outsource_male||record.outsource_female))
+                                        if(['위탁 (남에게 맡김)','위탁+자가 (함께 작업)'].includes(m) && (record.outsource_male||record.outsource_female))
                                             w.push('위탁: 남'+( record.outsource_male||0)+'명 여'+(record.outsource_female||0)+'명');
-                                        if(['자가 작업 (직접 함)','위탁+자가'].includes(m) && (record.self_male||record.self_female))
+                                        if(['자가 작업 (직접 함)','위탁+자가 (함께 작업)'].includes(m) && (record.self_male||record.self_female))
                                             w.push('자가: 남'+(record.self_male||0)+'명 여'+(record.self_female||0)+'명');
                                         return w.length ? '<p>👷 인원: '+w.join(' / ')+'</p>' : '';
                                     })()}` : ''}
                                     ${record.amount ? `<p>⚖️ 사용량: ${record.amount}</p>` : ''}
-                                    <p>${fmtAmt(record.material_cost) ? '💰 자재비: ' + fmtAmt(record.material_cost) : ''}</p>
-                                    ${record.labor_cost && parseInt(record.labor_cost) > 0 ? `<p>👷 인건비: ${fmtAmt(record.labor_cost).replace('원','')}원</p>` : ''}
+                                    ${fmtAmt(record.material_cost) ? `<p>💰 자재비: ${fmtAmt(record.material_cost)}</p>` : ''}
+                                    ${fmtAmt(record.labor_cost) ? `<p>👷 인건비: ${fmtAmt(record.labor_cost)}</p>` : ''}
                                     ${record.memo ? `<p>📝 ${record.memo}</p>` : ''}
                                 </div>
                             </div>
