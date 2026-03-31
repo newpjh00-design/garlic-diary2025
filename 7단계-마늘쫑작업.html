@@ -42,14 +42,15 @@ async function syncFromServer_old_disabled(phone) {
         }
 
 
-        // ★ 인원 입력 필드 표시/숨김
+        // ★ 작업 인원 표시/숨김
         function updateWorkerFields(method) {
-            const section = document.getElementById('workerSection');
-            const outDiv  = document.getElementById('outsourceWorkers');
-            const selfDiv = document.getElementById('selfWorkers');
-            if (!section) return;
-            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가'].includes(method);
-            const showSelf = ['자가 작업 (직접 함)', '위탁+자가'].includes(method);
+            var section  = document.getElementById('workerSection');
+            var outDiv   = document.getElementById('outsourceWorkers');
+            var selfDiv  = document.getElementById('selfWorkers');
+            if (!section || !outDiv || !selfDiv) return;
+            var m = String(method || '').trim();
+            var showOut  = (m === '위탁 (남에게 맡김)' || m === '위탁+자가 (함께 작업)');
+            var showSelf = (m === '자가 작업 (직접 함)'  || m === '위탁+자가 (함께 작업)');
             outDiv.style.display  = showOut  ? 'block' : 'none';
             selfDiv.style.display = showSelf ? 'block' : 'none';
             section.style.display = (showOut || showSelf) ? 'block' : 'none';
@@ -59,6 +60,12 @@ async function syncFromServer_old_disabled(phone) {
         function fmtMoney(v) {
             const n = parseInt(String(v||'').replace(/[^0-9]/g,''))||0;
             return n === 0 ? '' : n.toLocaleString('ko-KR');
+        }
+
+        // ★ 금액 안전 표시 (0이거나 없으면 빈칸)
+        function fmtAmt(v) {
+            var n = parseInt(String(v || '').replace(/[^0-9]/g, '')) || 0;
+            return n > 0 ? n.toLocaleString('ko-KR') + '원' : '';
         }
         function parseMoney(v) {
             return parseInt(String(v||'').replace(/[^0-9]/g,''))||0;
@@ -121,8 +128,8 @@ async function syncFromServer_old_disabled(phone) {
 
         function calculateSummary() {
             const totalRecords = surveyState.records.length;
-            const totalMaterialCost = surveyState.records.reduce((sum, r) => sum + (parseInt(r.material_cost) || 0), 0);
-            const totalLaborCost = surveyState.records.reduce((sum, r) => sum + (parseInt(r.labor_cost) || 0), 0);
+            const totalMaterialCost = surveyState.records.reduce((sum, r) => sum + ((parseInt(r.material_cost)||0) || 0), 0);
+            const totalLaborCost = surveyState.records.reduce((sum, r) => sum + ((parseInt(r.labor_cost)||0) || 0), 0);
             
             return {
                 total_records: totalRecords,
@@ -353,11 +360,11 @@ async function syncFromServer_old_disabled(phone) {
                                             w.push('자가: 남'+(record.self_male||0)+'명 여'+(record.self_female||0)+'명');
                                         return w.length ? '<p>👷 인원: '+w.join(' / ')+'</p>' : '';
                                     })()}` : ''}
-                                    ${record.unit_price ? `<p>💵 판매단가: ${parseInt(record.unit_price).toLocaleString()}원/kg</p>` : ''}
+                                    ${record.unit_price ? `<p>💵 판매단가: ${fmtAmt(record.unit_price)}/kg</p>` : ''}
                                     ${record.sales_amount ? `<p>⚖️ 판매량: ${parseFloat(record.sales_amount)}kg</p>` : ''}
-                                    ${record.sales_revenue ? `<p>💰 판매수익: ${parseInt(record.sales_revenue).toLocaleString()}원</p>` : ''}
-                                    <p>💰 자재비: ${parseInt(record.material_cost).toLocaleString()}원</p>
-                                    ${record.labor_cost && parseInt(record.labor_cost) > 0 ? `<p>👷 인건비: ${parseInt(record.labor_cost).toLocaleString()}원</p>` : ''}
+                                    ${record.sales_revenue ? `<p>💰 판매수익: ${fmtAmt(record.sales_revenue)}</p>` : ''}
+                                    <p>${fmtAmt(record.material_cost) ? '💰 자재비: ' + fmtAmt(record.material_cost) : ''}</p>
+                                    ${record.labor_cost && parseInt(record.labor_cost) > 0 ? `<p>👷 인건비: ${fmtAmt(record.labor_cost).replace('원','')}원</p>` : ''}
                                     ${record.memo ? `<p>📝 ${record.memo}</p>` : ''}
                                 </div>
                             </div>
@@ -502,10 +509,10 @@ async function syncFromServer_old_disabled(phone) {
                                         id="method"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-pink-500 focus:outline-none"
                                     >
-                                        <option value="">선택하세요</option>
+                                        <option value=""></option>
                                         <option value="위탁 (남에게 맡김)">위탁 (남에게 맡김)</option>
                                         <option value="자가 작업 (직접 함)">자가 작업 (직접 함)</option>
-                                        <option value="위탁+자가">위탁+자가</option>
+                                        <option value="위탁+자가 (함께 작업)">위탁+자가 (함께 작업)</option>
                                     </select>
                                 </div>
 
