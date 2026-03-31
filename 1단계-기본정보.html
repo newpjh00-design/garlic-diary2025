@@ -129,6 +129,12 @@
 
         function canMoveForward() { return isStepComplete(surveyState.currentStep); }
 
+        // ★ 버튼 상태만 업데이트 (전체 render 없이)
+        function updateButtonState() {
+            const btn = document.getElementById('nextBtn') || document.getElementById('submitBtn');
+            if (btn) btn.disabled = !canMoveForward();
+        }
+
         function nextStep() {
             if (!canMoveForward()) { alert('필수 항목을 입력해주세요'); return; }
             saveData();
@@ -198,7 +204,7 @@
                             ${q.helper?`<p class="text-sm text-gray-500 mt-1">${q.helper}</p>`:''}
                             <input type="text" class="mt-2 block w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                    value="${value||''}" placeholder="${q.helper?q.helper.replace('예: ',''):'입력하세요'}"
-                                   oninput="surveyState.formData['${q.key}']=this.value">
+                                   oninput="surveyState.formData['${q.key}']=this.value; updateButtonState();">
                         </label>
                     </div>`;
 
@@ -210,7 +216,7 @@
                             <div class="mt-2 flex items-center">
                                 <input type="number" class="block w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                        value="${value||''}" placeholder="숫자를 입력하세요"
-                                       oninput="surveyState.formData['${q.key}']=this.value">
+                                       oninput="surveyState.formData['${q.key}']=this.value; updateButtonState();">
                                 ${q.unit?`<span class="ml-3 text-gray-600">${q.unit}</span>`:''}
                             </div>
                         </label>
@@ -225,7 +231,7 @@
                                 <input type="text" inputmode="numeric"
                                        class="block w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                        value="${fmtMoney(value)}" placeholder="금액 입력 (예: 1,500,000)"
-                                       oninput="const v=parseMoney(this.value); surveyState.formData['${q.key}']=v; this.value=v?v.toLocaleString('ko-KR'):'';">
+                                       oninput="const v=parseMoney(this.value); surveyState.formData['${q.key}']=v; this.value=v?v.toLocaleString('ko-KR'):''; updateButtonState();">
                                 <span class="ml-3 text-gray-600">원</span>
                             </div>
                         </label>
@@ -420,7 +426,7 @@
                                 class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-50"
                                 ${isFirst?'disabled':''}>← 이전</button>
                         ${!isLast ? `
-                            <button onclick="nextStep()"
+                            <button id="nextBtn" onclick="nextStep()"
                                     class="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
                                     ${!canMoveForward()?'disabled':''}>다음 →</button>
                         ` : `
