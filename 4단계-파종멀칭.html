@@ -90,6 +90,7 @@ async function syncFromServer_old_disabled(phone) {
             const options = methodOptions[workType] || [];
             methodSelect.innerHTML = '<option value=""></option>' + 
                 options.map(option => `<option value="${option}">${option}</option>`).join('');
+                methodSelect.onchange = function(){ updateWorkerFields(this.value); };
         }
 
         function saveData() {
