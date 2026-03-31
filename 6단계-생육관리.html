@@ -46,14 +46,15 @@ async function syncFromServer_old_disabled(phone) {
         }
 
 
-        // ★ 인원 입력 필드 표시/숨김
+        // ★ 작업 인원 표시/숨김
         function updateWorkerFields(method) {
-            const section = document.getElementById('workerSection');
-            const outDiv  = document.getElementById('outsourceWorkers');
-            const selfDiv = document.getElementById('selfWorkers');
-            if (!section) return;
-            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가', '위탁+자가 (함께 작업)'].includes(method);
-            const showSelf = ['자가 작업 (직접 함)', '위탁+자가', '위탁+자가 (함께 작업)'].includes(method);
+            var section  = document.getElementById('workerSection');
+            var outDiv   = document.getElementById('outsourceWorkers');
+            var selfDiv  = document.getElementById('selfWorkers');
+            if (!section || !outDiv || !selfDiv) return;
+            var m = String(method || '').trim();
+            var showOut  = (m === '위탁 (남에게 맡김)' || m === '위탁+자가 (함께 작업)');
+            var showSelf = (m === '자가 작업 (직접 함)'  || m === '위탁+자가 (함께 작업)');
             outDiv.style.display  = showOut  ? 'block' : 'none';
             selfDiv.style.display = showSelf ? 'block' : 'none';
             section.style.display = (showOut || showSelf) ? 'block' : 'none';
@@ -64,6 +65,12 @@ async function syncFromServer_old_disabled(phone) {
             const n = parseInt(String(v||'').replace(/[^0-9]/g,''))||0;
             return n === 0 ? '' : n.toLocaleString('ko-KR');
         }
+
+        // ★ 금액 안전 표시 (0이거나 없으면 빈칸)
+        function fmtAmt(v) {
+            var n = parseInt(String(v || '').replace(/[^0-9]/g, '')) || 0;
+            return n > 0 ? n.toLocaleString('ko-KR') + '원' : '';
+        }
         function parseMoney(v) {
             return parseInt(String(v||'').replace(/[^0-9]/g,''))||0;
         }
@@ -72,11 +79,11 @@ async function syncFromServer_old_disabled(phone) {
 
         // 작업 종류별 방법 옵션
         const methodOptions = {
-            '웃거름(추비)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
-            '복토': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
-            '김매기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
-            '농약살포(살균제/살충제/제초제)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
-            '영양제': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
+            '웃거름(추비)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)'],
+            '복토': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)'],
+            '김매기': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)'],
+            '농약살포(살균제/살충제/제초제)': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)'],
+            '영양제': ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)'],
             '관수(물주기)': ['스프링클러', '점적관수', '호스(수동)']
         };
 
@@ -88,7 +95,7 @@ async function syncFromServer_old_disabled(phone) {
                 methodContainer.style.display = 'block';
                 const methodSelect = document.getElementById('method');
                 if (methodSelect) {
-                    methodSelect.innerHTML = '<option value="">선택하세요</option>' + 
+                    methodSelect.innerHTML = '<option value=""></option>' + 
                         methodOptions[workType].map(option => `<option value="${option}">${option}</option>`).join('');
                 }
             } else {
@@ -130,8 +137,8 @@ async function syncFromServer_old_disabled(phone) {
 
         function calculateSummary() {
             const totalRecords = surveyState.records.length;
-            const totalMaterialCost = surveyState.records.reduce((sum, r) => sum + (parseInt(r.material_cost) || 0), 0);
-            const totalLaborCost = surveyState.records.reduce((sum, r) => sum + (parseInt(r.labor_cost) || 0), 0);
+            const totalMaterialCost = surveyState.records.reduce((sum, r) => sum + ((parseInt(r.material_cost)||0) || 0), 0);
+            const totalLaborCost = surveyState.records.reduce((sum, r) => sum + ((parseInt(r.labor_cost)||0) || 0), 0);
             
             return {
                 total_records: totalRecords,
@@ -306,8 +313,8 @@ async function syncFromServer_old_disabled(phone) {
                                             w.push('자가: 남'+(record.self_male||0)+'명 여'+(record.self_female||0)+'명');
                                         return w.length ? '<p>👷 인원: '+w.join(' / ')+'</p>' : '';
                                     })()}` : ''}
-                                    <p>💰 자재비: ${parseInt(record.material_cost).toLocaleString()}원</p>
-                                    ${record.labor_cost ? `<p>👷 인건비: ${parseInt(record.labor_cost).toLocaleString()}원</p>` : ''}
+                                    <p>${fmtAmt(record.material_cost) ? '💰 자재비: ' + fmtAmt(record.material_cost) : ''}</p>
+                                    ${record.labor_cost ? `<p>👷 인건비: ${fmtAmt(record.labor_cost).replace('원','')}원</p>` : ''}
                                     ${record.memo ? `<p>📝 ${record.memo}</p>` : ''}
                                 </div>
                             </div>
@@ -451,7 +458,7 @@ async function syncFromServer_old_disabled(phone) {
                                         id="method"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none"
                                     >
-                                        <option value="">선택하세요</option>
+                                        <option value=""></option>
                                     </select>
                                 </div>
 
