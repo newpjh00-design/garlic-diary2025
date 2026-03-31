@@ -331,8 +331,8 @@ async function syncFromServer_old_disabled(phone) {
                                 </div>
                                 <div class="text-sm text-gray-700 space-y-1">
                                     ${record.method ? `<p>🔧 방법: ${record.method}</p>` : ''}
-                                    <p>${fmtAmt(record.material_cost) ? '💰 자재비: ' + fmtAmt(record.material_cost) : ''}</p>
-                                    ${record.labor_cost && parseInt(record.labor_cost) > 0 ? `<p>👷 인건비: ${fmtAmt(record.labor_cost).replace('원','')}원</p>` : ''}
+                                    ${fmtAmt(record.material_cost) ? `<p>💰 자재비: ${fmtAmt(record.material_cost)}</p>` : ''}
+                                    ${fmtAmt(record.labor_cost) ? `<p>👷 인건비: ${fmtAmt(record.labor_cost)}</p>` : ''}
                                     ${record.memo ? `<p>📝 ${record.memo}</p>` : ''}
                                 </div>
                             </div>
