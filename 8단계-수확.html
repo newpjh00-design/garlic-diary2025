@@ -43,14 +43,15 @@ async function syncFromServer_old_disabled(phone) {
         }
 
 
-        // ★ 인원 입력 필드 표시/숨김
+        // ★ 작업 인원 표시/숨김
         function updateWorkerFields(method) {
-            const section = document.getElementById('workerSection');
-            const outDiv  = document.getElementById('outsourceWorkers');
-            const selfDiv = document.getElementById('selfWorkers');
-            if (!section) return;
-            const showOut  = ['위탁 (남에게 맡김)', '위탁+자가', '위탁+자가 (함께 작업)'].includes(method);
-            const showSelf = ['자가 작업 (직접 함)', '위탁+자가', '위탁+자가 (함께 작업)'].includes(method);
+            var section  = document.getElementById('workerSection');
+            var outDiv   = document.getElementById('outsourceWorkers');
+            var selfDiv  = document.getElementById('selfWorkers');
+            if (!section || !outDiv || !selfDiv) return;
+            var m = String(method || '').trim();
+            var showOut  = (m === '위탁 (남에게 맡김)' || m === '위탁+자가 (함께 작업)');
+            var showSelf = (m === '자가 작업 (직접 함)'  || m === '위탁+자가 (함께 작업)');
             outDiv.style.display  = showOut  ? 'block' : 'none';
             selfDiv.style.display = showSelf ? 'block' : 'none';
             section.style.display = (showOut || showSelf) ? 'block' : 'none';
@@ -61,6 +62,12 @@ async function syncFromServer_old_disabled(phone) {
             const n = parseInt(String(v||'').replace(/[^0-9]/g,''))||0;
             return n === 0 ? '' : n.toLocaleString('ko-KR');
         }
+
+        // ★ 금액 안전 표시 (0이거나 없으면 빈칸)
+        function fmtAmt(v) {
+            var n = parseInt(String(v || '').replace(/[^0-9]/g, '')) || 0;
+            return n > 0 ? n.toLocaleString('ko-KR') + '원' : '';
+        }
         function parseMoney(v) {
             return parseInt(String(v||'').replace(/[^0-9]/g,''))||0;
         }
@@ -69,7 +76,7 @@ async function syncFromServer_old_disabled(phone) {
         // 작업 종류별 옵션
         const workTypeOptions = {
             '굴취수확': {
-                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
+                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)'],
                 fields: ['date', 'method', 'material_cost', 'labor_cost', 'harvest_amount', 'memo']
             },
             '건조': {
@@ -77,23 +84,23 @@ async function syncFromServer_old_disabled(phone) {
                 fields: ['date', 'method', 'material_cost', 'labor_cost', 'memo']
             },
             '줄기제거': {
-                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
+                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)'],
                 fields: ['date', 'method', 'material_cost', 'labor_cost', 'memo']
             },
             '수확(담기)': {
-                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
+                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)'],
                 fields: ['date', 'method', 'material_cost', 'labor_cost', 'memo']
             },
             '선별포장': {
-                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
+                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)'],
                 fields: ['date', 'method', 'material_cost', 'labor_cost', 'memo']
             },
             '저장': {
-                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
+                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)'],
                 fields: ['date', 'method', 'material_cost', 'labor_cost', 'memo']
             },
             '수매운반': {
-                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)', '위탁+자가'],
+                methods: ['위탁 (남에게 맡김)', '자가 작업 (직접 함)', '위탁+자가 (함께 작업)'],
                 fields: ['date', 'method', 'material_cost', 'labor_cost', 'memo'],
                 materialCostHelper: '유류비, 운송비 등'
             },
@@ -116,7 +123,7 @@ async function syncFromServer_old_disabled(phone) {
                 methodContainer.style.display = 'block';
                 const methodSelect = document.getElementById('method');
                 if (methodSelect) {
-                    methodSelect.innerHTML = '<option value="">선택하세요</option>' + 
+                    methodSelect.innerHTML = '<option value=""></option>' + 
                         config.methods.map(m => `<option value="${m}">${m}</option>`).join('');
                 }
 
@@ -521,12 +528,12 @@ async function syncFromServer_old_disabled(phone) {
                                                             </div>
                                                             <div>
                                                                 <span class="text-gray-500">판매액:</span>
-                                                                <span class="font-medium text-gray-900">${parseInt(record.sales_amount || 0).toLocaleString()}원</span>
+                                                                <span class="font-medium text-gray-900">${fmtAmt(record.sales_amount || 0)}</span>
                                                             </div>
                                                             ${record.shipping_cost && parseInt(record.shipping_cost) > 0 ? `
                                                                 <div>
                                                                     <span class="text-gray-500">출하비용:</span>
-                                                                    <span class="font-medium text-gray-900">${parseInt(record.shipping_cost).toLocaleString()}원</span>
+                                                                    <span class="font-medium text-gray-900">${fmtAmt(record.shipping_cost)}</span>
                                                                 </div>
                                                             ` : ''}
                                                             ${record.buyer ? `
@@ -540,11 +547,11 @@ async function syncFromServer_old_disabled(phone) {
                                                         <div class="grid grid-cols-2 gap-2 text-sm">
                                                             <div>
                                                                 <span class="text-gray-500">자재비:</span>
-                                                                <span class="font-medium text-gray-900">${parseInt(record.material_cost || 0).toLocaleString()}원</span>
+                                                                <span class="font-medium text-gray-900">${fmtAmt(record.material_cost || 0)}</span>
                                                             </div>
                                                             <div>
                                                                 <span class="text-gray-500">인건비:</span>
-                                                                <span class="font-medium text-gray-900">${parseInt(record.labor_cost || 0).toLocaleString()}원</span>
+                                                                <span class="font-medium text-gray-900">${fmtAmt(record.labor_cost || 0)}</span>
                                                             </div>
                                                             ${record.type === '굴취수확' && record.harvest_amount ? `
                                                                 <div class="col-span-2">
@@ -676,7 +683,7 @@ async function syncFromServer_old_disabled(phone) {
                                         onchange="updateWorkerFields(this.value)"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
                                     >
-                                        <option value="">선택하세요</option>
+                                        <option value=""></option>
                                     </select>
                                 </div>
 
