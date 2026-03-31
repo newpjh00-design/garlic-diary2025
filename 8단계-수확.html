@@ -905,39 +905,29 @@ async function syncFromServer_old_disabled(phone) {
             } catch(e) { /* 로컬 데이터 사용 */ }
         }
 
-        // ★ JSONP 방식 서버 동기화 (CORS 문제 우회)
-        function loadFromServerJSONP(phoneNumber) {
-            return new Promise((resolve) => {
-                const cbName = 'gasCallback_' + Date.now();
-                const timeout = setTimeout(() => {
-                    delete window[cbName];
-                    if (script.parentNode) script.parentNode.removeChild(script);
-                    resolve(null);
-                }, 8000);
-                window[cbName] = function(result) {
-                    clearTimeout(timeout);
-                    delete window[cbName];
-                    if (script.parentNode) script.parentNode.removeChild(script);
-                    resolve(result);
-                };
-                const script = document.createElement('script');
-                script.src = SCRIPT_URL + '?action=load&phone=' + encodeURIComponent(phoneNumber) + '&callback=' + cbName;
-                script.onerror = function() { clearTimeout(timeout); delete window[cbName]; resolve(null); };
-                document.head.appendChild(script);
-            });
-        }
-
+        // ★ POST 방식 서버 동기화 (CORS 문제 없음)
         async function syncFromServer(phone) {
-            const result = await loadFromServerJSONP(phone);
-            if (result && result.success && result.data && Object.keys(result.data).length > 1) {
-                const key = `garlic_survey_${phone}`;
-                const local = JSON.parse(localStorage.getItem(key)||'{}');
-                const flatServer = flattenData(result.data);
-                const merged = Object.assign({}, flattenData(local), flatServer);
-                localStorage.setItem(key, JSON.stringify(merged));
-                console.log('✅ 서버 데이터 동기화 완료');
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'load', phoneNumber: phone })
+                });
+                const result = await response.json();
+                if (result && result.success && result.data && Object.keys(result.data).length > 1) {
+                    const key = `garlic_survey_${phone}`;
+                    const local = JSON.parse(localStorage.getItem(key)||'{}');
+                    const flat = flattenData(result.data);
+                    const merged = Object.assign({}, flattenData(local), flat);
+                    localStorage.setItem(key, JSON.stringify(merged));
+                    console.log('✅ 서버 동기화 완료');
+                }
+            } catch(e) {
+                console.log('서버 동기화 실패:', e.message);
             }
         }
+
 
         // ★ 비동기 초기화
         async function init() {
