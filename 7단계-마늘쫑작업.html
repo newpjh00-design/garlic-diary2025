@@ -25,6 +25,30 @@
             editingId: null
         };
 
+
+        // ★ 서버 동기화 함수 (기기 간 이어쓰기)
+        async function syncFromServer(phone) {
+            try {
+                const resp = await fetch(`${SCRIPT_URL}?action=load&phone=${encodeURIComponent(phone)}`);
+                if (!resp.ok) throw new Error();
+                const result = await resp.json();
+                if (result.success && result.data && Object.keys(result.data).length > 0) {
+                    const key = `garlic_survey_${phone}`;
+                    const local = JSON.parse(localStorage.getItem(key)||'{}');
+                    localStorage.setItem(key, JSON.stringify(Object.assign({}, local, result.data)));
+                }
+            } catch(e) { /* 로컬 데이터 사용 */ }
+        }
+
+        // ★ 천단위 콤마 유틸리티
+        function fmtMoney(v) {
+            const n = parseInt(String(v||'').replace(/[^0-9]/g,''))||0;
+            return n === 0 ? '' : n.toLocaleString('ko-KR');
+        }
+        function parseMoney(v) {
+            return parseInt(String(v||'').replace(/[^0-9]/g,''))||0;
+        }
+
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyddb2aW1WXORKjC0oJsabEPKX1_KgGT_xpg4Op2O2Zm1QiHUWl9XZyjjAuWevwm2w/exec';
 
         function updateFormFields(workType) {
@@ -137,7 +161,9 @@
             render();
         }
 
+        let _isSubmitting = false;
         async function submitStage() {
+            if (_isSubmitting) return;
             if (surveyState.records.length === 0) {
                 alert('⚠️ 최소 1개 이상의 작업을 기록해야 제출할 수 있습니다.');
                 return;
@@ -154,6 +180,7 @@
                 completed_stage_7: true
             };
 
+            _isSubmitting = true;
             try {
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
@@ -166,16 +193,15 @@
                 saveData();
 
                 alert('✅ 7단계가 제출되었습니다!\n\n메인 화면으로 돌아가 다음 단계를 진행하세요.');
-                window.location.href = 'index.html';
+                _isSubmitting = false; window.location.href = 'index.html';
             } catch (error) {
                 console.error('제출 오류:', error);
                 alert('✅ 7단계가 저장되었습니다!\n\n메인 화면으로 돌아가 다음 단계를 진행하세요.');
-                window.location.href = 'index.html';
+                _isSubmitting = false; window.location.href = 'index.html';
             }
         }
 
-        function handleFormSubmit(event) {
-            event.preventDefault();
+        function handleFormSubmit() {
             
             const workType = document.querySelector('input[name="work_type"]:checked')?.value;
             
@@ -187,8 +213,8 @@
             const formData = {
                 date: document.getElementById('date').value,
                 work_type: workType,
-                material_cost: document.getElementById('material_cost').value || '0',
-                labor_cost: document.getElementById('labor_cost').value || '0',
+                material_cost: String(parseMoney(document.getElementById('material_cost').value)),
+                labor_cost: String(parseMoney(document.getElementById('labor_cost').value)),
                 memo: document.getElementById('memo').value
             };
 
@@ -199,8 +225,8 @@
                     return;
                 }
             } else if (workType === '마늘쫑 판매') {
-                formData.unit_price = document.getElementById('unit_price').value;
-                formData.sales_amount = document.getElementById('sales_amount').value;
+                formData.unit_price = String(parseMoney(document.getElementById('unit_price').value));
+                formData.sales_amount = String(parseMoney(document.getElementById('sales_amount').value));
                 
                 if (!formData.unit_price || !formData.sales_amount) {
                     alert('판매단가와 판매량을 모두 입력해주세요.');
@@ -397,7 +423,7 @@
                                 ${editingRecord ? '✏️ 작업 기록 수정' : '➕ 새 작업 기록'}
                             </h2>
 
-                            <form id="recordForm" onsubmit="handleFormSubmit(event)" class="space-y-6">
+                            <form id="recordForm" class="space-y-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">
                                         📅 작업 날짜 <span class="text-red-500">*</span>
@@ -459,7 +485,8 @@
                                                 min="0"
                                                 placeholder="kg당 판매 가격"
                                                 class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-pink-500 focus:outline-none"
-                                            />
+                                        oninput="this.value=fmtMoney(this.value)"
+                                    />
                                             <p class="text-xs text-gray-500 mt-1">마늘쫑 1kg당 판매 가격</p>
                                         </div>
 
@@ -474,7 +501,8 @@
                                                 step="0.1"
                                                 placeholder="판매한 마늘쫑 무게"
                                                 class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-pink-500 focus:outline-none"
-                                            />
+                                        oninput="this.value=fmtMoney(this.value)"
+                                    />
                                             <p class="text-xs text-gray-500 mt-1">판매한 마늘쫑의 총 무게</p>
                                         </div>
                                     </div>
@@ -491,6 +519,7 @@
                                         min="0"
                                         placeholder="자재 구입 비용"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-pink-500 focus:outline-none"
+                                        oninput="this.value=fmtMoney(this.value)"
                                     />
                                     <p class="text-xs text-gray-500 mt-1">자재 구입 비용</p>
                                 </div>
@@ -506,6 +535,7 @@
                                         min="0"
                                         placeholder="작업 인건비"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-pink-500 focus:outline-none"
+                                        oninput="this.value=fmtMoney(this.value)"
                                     />
                                     <p class="text-xs text-gray-500 mt-1">작업 인건비 (고용 또는 위탁)</p>
                                 </div>
@@ -531,7 +561,7 @@
                                         취소
                                     </button>
                                     <button 
-                                        type="submit"
+                                        type="button" onclick="handleFormSubmit()"
                                         class="flex-1 px-6 py-3 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700"
                                     >
                                         ${editingRecord ? '수정 완료' : '기록 추가'}
@@ -565,8 +595,31 @@
             }
         }
 
-        surveyState.view = 'intro';
-        render();
+        // ★ 서버 동기화 (기기 간 이어쓰기)
+        async function syncFromServer(phone) {
+            try {
+                const resp = await fetch(`${SCRIPT_URL}?action=load&phone=${encodeURIComponent(phone)}`);
+                if (!resp.ok) throw new Error();
+                const result = await resp.json();
+                if (result.success && result.data && Object.keys(result.data).length > 0) {
+                    const key = `garlic_survey_${phone}`;
+                    const local = JSON.parse(localStorage.getItem(key)||'{}');
+                    localStorage.setItem(key, JSON.stringify(Object.assign({}, local, result.data)));
+                }
+            } catch(e) { /* 로컬 데이터 사용 */ }
+        }
+
+        // ★ 비동기 초기화
+        async function init() {
+            const phone = localStorage.getItem('garlic_survey_phone');
+            if (!phone) { window.location.href = 'index.html'; return; }
+            surveyState.phoneNumber = phone;
+            await syncFromServer(phone);
+            surveyState.view = 'intro';
+            render();
+        }
+        init();
+
     </script>
 </body>
 </html>
