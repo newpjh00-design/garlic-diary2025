@@ -87,34 +87,52 @@
         // ==================== 데이터 관리 ====================
         
         // 서버에서 데이터 불러오기
-        async function loadFromServer(phoneNumber) {
+        // ★ 중첩 formData 평탄화
+        function flattenData(parsed) {
+            if (!parsed) return {};
+            const result = Object.assign({}, parsed.formData || {}, parsed);
+            delete result.formData;
+            return result;
+        }
+
+        async function loadFromServer(phoneNumber, showStatus) {
+            if (showStatus) showStatus('🔄 서버에서 데이터 불러오는 중...');
             try {
-                const response = await fetch(`${SCRIPT_URL}?action=load&phone=${encodeURIComponent(phoneNumber)}`);
-                
-                if (!response.ok) {
-                    throw new Error(`서버 응답 오류: ${response.status}`);
-                }
-                
+                const response = await fetch(
+                    `${SCRIPT_URL}?action=load&phone=${encodeURIComponent(phoneNumber)}`,
+                    { redirect: 'follow' }
+                );
+                if (!response.ok) throw new Error(`서버 응답 오류: ${response.status}`);
                 const result = await response.json();
-                
-                if (result.success && result.data) {
-                    // 서버 데이터를 localStorage에 동기화
-                    localStorage.setItem(`garlic_survey_${phoneNumber}`, JSON.stringify(result.data));
+                if (result.success && result.data && Object.keys(result.data).length > 1) {
+                    // ★ 서버 데이터 평탄화 후 localStorage 저장
+                    const flat = flattenData(result.data);
+                    const local = JSON.parse(localStorage.getItem(`garlic_survey_${phoneNumber}`) || '{}');
+                    const merged = Object.assign({}, flattenData(local), flat);
+                    localStorage.setItem(`garlic_survey_${phoneNumber}`, JSON.stringify(merged));
+                    if (showStatus) showStatus('✅ 동기화 완료');
                     console.log('✅ 서버에서 데이터 로드 성공');
-                    return result.data;
+                    return merged;
+                } else {
+                    if (showStatus) showStatus('ℹ️ 서버에 저장된 데이터 없음');
                 }
             } catch (error) {
+                if (showStatus) showStatus('⚠️ 동기화 실패 (로컬 데이터 사용)');
                 console.error('⚠️ 서버 데이터 로드 실패:', error);
             }
-            
-            // 서버 실패 시 localStorage 사용
             const localData = localStorage.getItem(`garlic_survey_${phoneNumber}`);
-            if (localData) {
-                console.log('📱 localStorage에서 데이터 로드');
-                return JSON.parse(localData);
-            }
-            
+            if (localData) return flattenData(JSON.parse(localData));
             return {};
+        }
+
+        // ★ 수동 동기화 버튼 클릭 시
+        async function manualSync() {
+            const phone = localStorage.getItem('garlic_survey_phone');
+            if (!phone) return;
+            const statusEl = document.getElementById('syncStatus');
+            const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg; };
+            await loadFromServer(phone, setStatus);
+            setTimeout(() => showMainPage(), 800);
         }
 
         // ==================== 로그인 ====================
@@ -165,7 +183,7 @@
             }
             
             // 서버에서 데이터 불러오기
-            const allData = await loadFromServer(phone);
+            const allData = await loadFromServer(phone, null);
             
             // 완료 상태 추출
             const completedStages = {
@@ -210,6 +228,15 @@
                                 <span class="text-lg">🚪</span>
                                 <span>로그아웃</span>
                             </button>
+                        </div>
+
+                        <!-- ★ 동기화 버튼 -->
+                        <div class="mt-3">
+                            <button onclick="manualSync()"
+                                    class="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-300 text-blue-700 rounded-lg text-sm hover:bg-blue-100 transition-colors">
+                                🔄 다른 기기 데이터 불러오기
+                            </button>
+                            <span id="syncStatus" class="ml-3 text-sm text-gray-500"></span>
                         </div>
                         
                         <!-- 전체 진행률 -->
