@@ -27,7 +27,8 @@
 
 
         // ★ 서버 동기화 함수 (기기 간 이어쓰기)
-        async function syncFromServer(phone) {
+        // replaced
+async function syncFromServer_old_disabled(phone) {
             try {
                 const resp = await fetch(`${SCRIPT_URL}?action=load&phone=${encodeURIComponent(phone)}`);
                 if (!resp.ok) throw new Error();
@@ -601,7 +602,8 @@
         }
 
         // ★ 서버 동기화 (기기 간 이어쓰기)
-        async function syncFromServer(phone) {
+        // replaced
+async function syncFromServer_old_disabled(phone) {
             try {
                 const resp = await fetch(`${SCRIPT_URL}?action=load&phone=${encodeURIComponent(phone)}`);
                 if (!resp.ok) throw new Error();
@@ -612,6 +614,40 @@
                     localStorage.setItem(key, JSON.stringify(Object.assign({}, local, result.data)));
                 }
             } catch(e) { /* 로컬 데이터 사용 */ }
+        }
+
+        // ★ JSONP 방식 서버 동기화 (CORS 문제 우회)
+        function loadFromServerJSONP(phoneNumber) {
+            return new Promise((resolve) => {
+                const cbName = 'gasCallback_' + Date.now();
+                const timeout = setTimeout(() => {
+                    delete window[cbName];
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    resolve(null);
+                }, 8000);
+                window[cbName] = function(result) {
+                    clearTimeout(timeout);
+                    delete window[cbName];
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    resolve(result);
+                };
+                const script = document.createElement('script');
+                script.src = SCRIPT_URL + '?action=load&phone=' + encodeURIComponent(phoneNumber) + '&callback=' + cbName;
+                script.onerror = function() { clearTimeout(timeout); delete window[cbName]; resolve(null); };
+                document.head.appendChild(script);
+            });
+        }
+
+        async function syncFromServer(phone) {
+            const result = await loadFromServerJSONP(phone);
+            if (result && result.success && result.data && Object.keys(result.data).length > 1) {
+                const key = `garlic_survey_${phone}`;
+                const local = JSON.parse(localStorage.getItem(key)||'{}');
+                const flatServer = flattenData(result.data);
+                const merged = Object.assign({}, flattenData(local), flatServer);
+                localStorage.setItem(key, JSON.stringify(merged));
+                console.log('✅ 서버 데이터 동기화 완료');
+            }
         }
 
         // ★ 비동기 초기화
