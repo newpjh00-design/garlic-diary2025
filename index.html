@@ -130,15 +130,24 @@
         async function loadFromServer(phoneNumber) {
             // ★ JSONP 방식으로 CORS 문제 우회
             const result = await loadFromServerJSONP(phoneNumber);
-            if (result && result.success && result.data && Object.keys(result.data).length > 1) {
+            console.log('서버 응답 원본:', JSON.stringify(result));
+
+            if (result === null) {
+                console.warn('⚠️ 서버 연결 실패 (타임아웃 또는 네트워크 오류)');
+                window._syncStatus = '⚠️ 서버 연결 실패';
+            } else if (result && result.success && result.data && Object.keys(result.data).length > 1) {
                 const flat = flattenData(result.data);
                 const local = JSON.parse(localStorage.getItem(`garlic_survey_${phoneNumber}`) || '{}');
                 const merged = Object.assign({}, flattenData(local), flat);
                 localStorage.setItem(`garlic_survey_${phoneNumber}`, JSON.stringify(merged));
-                console.log('✅ 서버 동기화 완료');
+                console.log('✅ 서버 동기화 완료, 데이터 키:', Object.keys(flat).join(', '));
+                window._syncStatus = '✅ 동기화 완료 (' + Object.keys(flat).length + '개 항목)';
                 return merged;
+            } else {
+                console.log('ℹ️ 서버에 저장된 데이터 없음');
+                window._syncStatus = 'ℹ️ 서버에 저장된 데이터 없음';
             }
-            console.log('ℹ️ 서버 데이터 없음, 로컬 사용');
+
             const localData = localStorage.getItem(`garlic_survey_${phoneNumber}`);
             if (localData) return flattenData(JSON.parse(localData));
             return {};
@@ -237,6 +246,11 @@
                                 <span class="text-lg">🚪</span>
                                 <span>로그아웃</span>
                             </button>
+                        </div>
+
+                        <!-- 동기화 상태 표시 -->
+                        <div class="mt-2 text-xs text-gray-400" id="syncStatusBox">
+                            서버 동기화: ${window._syncStatus || '확인 중...'}
                         </div>
 
                         <!-- 전체 진행률 -->
