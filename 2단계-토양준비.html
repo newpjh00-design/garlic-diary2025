@@ -442,9 +442,9 @@
                                         💰 자재비 (원)
                                     </label>
                                     <input 
-                                        type="number" 
+                                        type="text" inputmode="numeric" 
                                         id="material_cost"
-                                        value="${editingRecord ? editingRecord.material_cost : ''}"
+                                        value="${editingRecord ? (parseInt(editingRecord.material_cost)||0).toLocaleString('ko-KR') : ''}"
                                         min="0"
                                         placeholder="약제, 비료, 연료 등 자재 비용"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
@@ -458,9 +458,9 @@
                                         👷 인건비 (원)
                                     </label>
                                     <input 
-                                        type="number" 
+                                        type="text" inputmode="numeric" 
                                         id="labor_cost"
-                                        value="${editingRecord ? editingRecord.labor_cost : ''}"
+                                        value="${editingRecord ? (parseInt(editingRecord.labor_cost)||0).toLocaleString('ko-KR') : ''}"
                                         min="0"
                                         placeholder="위탁비, 고용 인력 임금 등"
                                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
